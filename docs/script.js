@@ -19,6 +19,7 @@ const allCombinedModels = [
   { category: "open", model: "Qwen2.5-Coder-32B-Instruct", atom: 90.2, single: 81.0, multi: 71.0, api: 83.0, pref: 81.0, summary: 84.1, special: 80.7, agent: 60.8, overall: 79.6 },
   { category: "open", model: "DeepSeekV3", atom: 91.5, single: 84.0, multi: 77.0, api: 83.0, pref: 83.0, summary: 86.5, special: 73.0, agent: 34.5, overall: 74.8 },
   { category: "open", model: "Qwen2.5-72B-Instruct", atom: 86.8, single: 80.3, multi: 69.5, api: 83.0, pref: 81.0, summary: 82.1, special: 75.7, agent: 45.0, overall: 74.7 },
+  { category: "open", model: "ToolACE-2.5-Llama-3.1-8B", atom: 89.0, single: 80.2, multi: 69.0, api: 81.0, pref: 72.0, summary: 82.1, special: 75.6, agent: 28.8, overall: 72.2 },
   { category: "open", model: "Llama-3.1-70B-Instruct", atom: 82.5, single: 68.3, multi: 63.5, api: 79.0, pref: 68.0, summary: 75.5, special: 38.3, agent: 42.3, overall: 60.4 },
   { category: "open", model: "Qwen2.5-7B-Instruct", atom: 76.0, single: 60.3, multi: 58.5, api: 72.0, pref: 67.0, summary: 69.4, special: 47.0, agent: 13.8, overall: 54.8 },
   { category: "open", model: "DeepSeek-Coder-V2-Lite-Instruct", atom: 75.2, single: 57.8, multi: 46.5, api: 72.0, pref: 65.0, summary: 66.4, special: 40.3, agent: 2.0, overall: 49.5 },
@@ -56,6 +57,7 @@ const allChineseModels = [
   { category: "open", model: "Qwen2.5-Coder-32B-Instruct", atom: 94.3, single: 88.5, multi: 83.0, api: 90.0, pref: 90.0, summary: 90.8, special: 81.3, agent: 71.5, overall: 85.3 },
   { category: "open", model: "Qwen2.5-72B-Instruct", atom: 92.3, single: 86.0, multi: 75.0, api: 90.0, pref: 82.0, summary: 87.3, special: 77.3, agent: 52.5, overall: 79.3 },
   { category: "open", model: "DeepSeekV3", atom: 95.0, single: 90.5, multi: 91.0, api: 90.0, pref: 88.0, summary: 92.6, special: 73.3, agent: 35.0, overall: 78.5 },
+  { category: "open", model: "ToolACE-2.5-Llama-3.1-8B", atom: 90.3, single: 85.5, multi: 76.0, api: 88.0, pref: 78.0, summary: 85.9, special: 75.3, agent: 21.7, overall: 73.2 },
   { category: "open", model: "Llama-3.1-70B-Instruct", atom: 81.3, single: 65.0, multi: 66.0, api: 84.0, pref: 70.0, summary: 75.3, special: 47.3, agent: 43.5, overall: 62.9 },
   { category: "open", model: "Qwen2.5-7B-Instruct", atom: 81.7, single: 63.5, multi: 68.0, api: 82.0, pref: 76.0, summary: 75.9, special: 44.7, agent: 12.5, overall: 57.8 },
   { category: "open", model: "DeepSeek-Coder-V2-Lite-Instruct", atom: 78.7, single: 57.5, multi: 43.0, api: 82.0, pref: 70.0, summary: 68.8, special: 41.3, agent: 1.5, overall: 51.1 },
@@ -82,6 +84,7 @@ const allEnglishModels = [
   // Open-Source Large Language Models
   { category: "open", model: "Kimi-k2-0711", atom: 87.0, single: 78.5, multi: 62.0, api: 70.0, pref: 74.0, summary: 78.9, special: 81.3, agent: 65.0, overall: 77.4 },
   { category: "open", model: "Qwen2.5-Coder-32B-Instruct", atom: 86.0, single: 73.5, multi: 59.0, api: 76.0, pref: 72.0, summary: 77.4, special: 80.0, agent: 50.0, overall: 73.9 },
+  { category: "open", model: "ToolACE-2.5-Llama-3.1-8B", atom: 87.7, single: 75.5, multi: 62.0, api: 74.0, pref: 66.0, summary: 78.3, special: 76.0, agent: 35.9, overall: 71.1 },
   { category: "open", model: "DeepSeekV3", atom: 88.0, single: 77.5, multi: 63.0, api: 76.0, pref: 78.0, summary: 80.3, special: 72.7, agent: 34.0, overall: 71.1 },
   { category: "open", model: "Qwen2.5-72B-Instruct", atom: 81.3, single: 74.5, multi: 64.0, api: 76.0, pref: 80.0, summary: 76.8, special: 74.0, agent: 37.5, overall: 70.0 },
   { category: "open", model: "Llama-3.1-70B-Instruct", atom: 83.7, single: 71.5, multi: 61.0, api: 74.0, pref: 66.0, summary: 75.6, special: 29.3, agent: 41.0, overall: 57.9 },
