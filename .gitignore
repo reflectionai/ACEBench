@@ -12,4 +12,12 @@ test.py
 ./data_all/data_zh/dialogue_history
 *.env
 !.env.template
+
 # leaderboard/
+
+# Pants workspace files
+/.pants.d
+/dist/'
+.jj
+eval_all
+
