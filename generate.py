@@ -41,7 +41,7 @@ def get_args():
 
 
 
-def load_test_cases(base_path, filenames):
+def load_test_cases(base_path, filenames) -> list[object]:
     cases = []
     
     for filename in filenames:

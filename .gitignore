@@ -17,5 +17,8 @@ data_all/data_zh/dialogue_history/
 # leaderboard/
 
 # Pants workspace files
-.pants.d
-/dist/
+/.pants.d
+/dist/'
+.jj
+eval_all
+

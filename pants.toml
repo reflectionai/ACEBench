@@ -1,0 +1,87 @@
+[GLOBAL]
+pants_version="2.24.1"
+
+# directly from olympus
+backend_packages = [
+  "pants.backend.build_files.fmt.ruff",
+  "pants.backend.codegen.protobuf.python",
+  "pants.backend.python",
+  "pants.backend.experimental.python.lint.ruff.check",
+  "pants.backend.experimental.python.lint.ruff.format",
+  "pants.backend.docker",
+  "pants.backend.experimental.adhoc",
+  "pants.backend.experimental.visibility",
+  "pants.backend.shell",
+  "pants.backend.shell.lint.shellcheck",
+  "pants.backend.shell.lint.shfmt",
+  "pants.backend.experimental.javascript.lint.prettier",
+  "pants.backend.experimental.python",
+  "pants.backend.experimental.typescript",
+  "pants.backend.experimental.javascript",
+  "pants.backend.experimental.python.typecheck.pyright",
+  "pants.backend.tools.taplo",
+]
+pants_ignore = [
+  "!.pantslock/",
+  "/olympus/genesis/frontend/.vite",
+  ".jj/",
+  ".git/",
+]
+
+[source]
+root_patterns = ["/"]
+
+[python]
+default_resolve = 'base'
+interpreter_constraints = ['==3.12.*']
+enable_resolves = true
+pip_version = '25.1'
+resolves.base = '.pantslock/base.lock'
+resolves.ci = '.pantslock/ci.lock'
+resolves.pytest = '.pantslock/pytest.lock'
+resolves.mypy = '.pantslock/mypy.lock'
+resolves.dockerfile-parser = '.pantslock/dockerfile-parser.lock'
+resolves.pulumi = '.pantslock/pulumi.lock'
+resolves.vllm = '.pantslock/vllm.lock'
+
+[python-infer]
+unowned_dependency_behavior = 'error'
+
+[export]
+py_resolve_format = 'symlinked_immutable_virtualenv'
+
+[environments-preview.names]
+linux = "//:linux-py12"
+
+[pytest]
+args = ["--error-for-skips", "--asyncio-mode=strict"]
+install_from_resolve = "pytest"
+requirements = [
+  "//:pytest",
+] # https://www.pantsbuild.org/2.21/docs/python/goals/test#debugging-tests
+xdist_enabled = true
+
+[test]
+extra_env_vars = [
+  "PYTHONBREAKPOINT=import ipdb; ipdb.set_trace",
+
+  # These four variables are used to prevent tests which import torch from doing
+  # multithreaded initialization.
+  "OMP_NUM_THREADS=1",
+  "MKL_NUM_THREADS=1",
+  "OPENBLAS_NUM_THREADS=1",
+  "NUMEXPR_NUM_THREADS=1",
+  # If this exists, we want to propagate it
+  "GOOGLE_APPLICATION_CREDENTIALS",
+]
+
+
+[pex-cli]
+version = "v2.37.0"
+known_versions = [
+  "v2.37.0|macos_x86_64|7c51adfaaef9c48ef41f36053b4c951d85a675c2723e821e12617793ae8f2275|4812111",
+  "v2.37.0|macos_arm64|7c51adfaaef9c48ef41f36053b4c951d85a675c2723e821e12617793ae8f2275|4812111",
+  "v2.37.0|linux_x86_64|7c51adfaaef9c48ef41f36053b4c951d85a675c2723e821e12617793ae8f2275|4812111",
+  "v2.37.0|linux_arm64|7c51adfaaef9c48ef41f36053b4c951d85a675c2723e821e12617793ae8f2275|4812111",
+]
+
