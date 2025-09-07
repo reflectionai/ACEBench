@@ -1,4 +1,3 @@
-
 import glob
 import json
 import os
@@ -44,13 +43,25 @@ COLUMNS = [
     "Summary",
 ]
 
-closed_model_list = ["o1-mini", "gpt-4o-mini-2024-07-18", "gpt-4o-2024-11-20", "gpt-4-turbo-2024-04-09", "qwen-max", "doubao-pro-32k", "claude-3-5-sonnet-20241022", "gemini-1.5-pro", "deepseek-chat"]
+closed_model_list = [
+    "o1-mini",
+    "gpt-4o-mini-2024-07-18",
+    "gpt-4o-2024-11-20",
+    "gpt-4-turbo-2024-04-09",
+    "qwen-max",
+    "doubao-pro-32k",
+    "claude-3-5-sonnet-20241022",
+    "gemini-1.5-pro",
+    "deepseek-chat",
+]
 
 V100_x8_PRICE_PER_HOUR = 22.032
+
 
 def extract_after_test(input_string):
     parts = input_string.split("data_")[1].split("_result")[0].split(".json")[0]
     return parts
+
 
 def find_file_with_suffix(folder_path, suffix):
     json_files_pattern = os.path.join(folder_path, "*.json")
@@ -61,13 +72,15 @@ def find_file_with_suffix(folder_path, suffix):
         if suffix in json_file.split("/")[-1]:
             return json_file
 
+
 def load_file(file_path):
     result = []
-    with open(file_path, encoding='utf-8') as f:
+    with open(file_path, encoding="utf-8") as f:
         file = f.readlines()
         for line in file:
             result.append(json.loads(line))
     return result
+
 
 def is_empty_output(decoded_output):
     if not is_function_call_format_valid(decoded_output):
@@ -76,6 +89,7 @@ def is_empty_output(decoded_output):
         return True
     if len(decoded_output) == 1 and len(decoded_output[0]) == 0:
         return True
+
 
 def multiplt_turn_accuracy(score_list):
     end_score_list = []
@@ -94,6 +108,7 @@ def multiplt_turn_accuracy(score_list):
     process_score_total = round(sum(process_score_list) / len(process_score_list), 3)
     return end_score_total, process_score_total
 
+
 def calculate_weighted_accuracy(accuracy_dict_list):
     total_count = 0
     total_accuracy = 0
@@ -104,7 +119,11 @@ def calculate_weighted_accuracy(accuracy_dict_list):
     if total_count == 0:
         return {"accuracy": 0, "total_count": 0}
 
-    return {"accuracy": round(total_accuracy / total_count, 3), "total_count": total_count}
+    return {
+        "accuracy": round(total_accuracy / total_count, 3),
+        "total_count": total_count,
+    }
+
 
 def calculate_unweighted_accuracy(accuracy_dict_list):
     total_accuracy = 0
@@ -114,7 +133,11 @@ def calculate_unweighted_accuracy(accuracy_dict_list):
     if len(accuracy_dict_list) == 0:
         return {"accuracy": 0, "total_count": 0}
 
-    return {"accuracy": round(total_accuracy / len(accuracy_dict_list), 3), "total_count": 0}
+    return {
+        "accuracy": round(total_accuracy / len(accuracy_dict_list), 3),
+        "total_count": 0,
+    }
+
 
 def update_result_table_with_score_file(leaderboard_table, score_path):
     entries = os.scandir(score_path)
@@ -132,8 +155,13 @@ def update_result_table_with_score_file(leaderboard_table, score_path):
             if "process" not in model_score_json:
                 if "agent" not in model_score_json:
                     metadata = load_file(model_score_json)[0]
-                    accuracy, total_count = metadata["accuracy"], metadata["total_count"]
-                    test_category = model_score_json.split("_score.json")[0].split("/")[-1]
+                    accuracy, total_count = (
+                        metadata["accuracy"],
+                        metadata["total_count"],
+                    )
+                    test_category = model_score_json.split("_score.json")[0].split("/")[
+                        -1
+                    ]
                     test_category = test_category.split("\\")[-1]
                     if model_name not in leaderboard_table:
                         leaderboard_table[model_name] = {}
@@ -144,8 +172,14 @@ def update_result_table_with_score_file(leaderboard_table, score_path):
                         }
                 else:
                     metadata = load_file(model_score_json)[0]
-                    accuracy, process_accuracy, total_count = metadata["end_to_end_accuracy"], metadata["process_accuracy"], metadata["total_count"]
-                    test_category = model_score_json.split("_score.json")[0].split("/")[-1]
+                    accuracy, process_accuracy, total_count = (
+                        metadata["end_to_end_accuracy"],
+                        metadata["process_accuracy"],
+                        metadata["total_count"],
+                    )
+                    test_category = model_score_json.split("_score.json")[0].split("/")[
+                        -1
+                    ]
                     test_category = test_category.split("\\")[-1]
                     if model_name not in leaderboard_table:
                         leaderboard_table[model_name] = {}
@@ -156,57 +190,113 @@ def update_result_table_with_score_file(leaderboard_table, score_path):
                             "total_count": total_count,
                         }
 
+
 # Calculate weighted accuracy
 def generate_result_csv(leaderboard_table, output_path):
     data_close = []
     data_open = []
     for model_name, value in leaderboard_table.items():
-        unusal_lose = value.get("data_special_incomplete", {"accuracy": 0, "total_count": 0})
-        unusal_error = value.get("data_special_error_param", {"accuracy": 0, "total_count": 0})
-        unusal_exceeding = value.get("data_special_irrelevant", {"accuracy": 0, "total_count": 0})
+        unusal_lose = value.get(
+            "data_special_incomplete", {"accuracy": 0, "total_count": 0}
+        )
+        unusal_error = value.get(
+            "data_special_error_param", {"accuracy": 0, "total_count": 0}
+        )
+        unusal_exceeding = value.get(
+            "data_special_irrelevant", {"accuracy": 0, "total_count": 0}
+        )
 
-        atom_bool = value.get("data_normal_atom_bool", {"accuracy": 0, "total_count": 0})
-        atom_enum = value.get("data_normal_atom_enum", {"accuracy": 0, "total_count": 0})
-        atom_number = value.get("data_normal_atom_number", {"accuracy": 0, "total_count": 0})  # updated
-        atom_list = value.get("data_normal_atom_list", {"accuracy": 0, "total_count": 0})      # updated
-        atom_object_deep = value.get("data_normal_atom_object_deep", {"accuracy": 0, "total_count": 0})  # updated
-        atom_object_short = value.get("data_normal_atom_object_short", {"accuracy": 0, "total_count": 0})  # updated
+        atom_bool = value.get(
+            "data_normal_atom_bool", {"accuracy": 0, "total_count": 0}
+        )
+        atom_enum = value.get(
+            "data_normal_atom_enum", {"accuracy": 0, "total_count": 0}
+        )
+        atom_number = value.get(
+            "data_normal_atom_number", {"accuracy": 0, "total_count": 0}
+        )  # updated
+        atom_list = value.get(
+            "data_normal_atom_list", {"accuracy": 0, "total_count": 0}
+        )  # updated
+        atom_object_deep = value.get(
+            "data_normal_atom_object_deep", {"accuracy": 0, "total_count": 0}
+        )  # updated
+        atom_object_short = value.get(
+            "data_normal_atom_object_short", {"accuracy": 0, "total_count": 0}
+        )  # updated
 
-        normal_ss = value.get("data_normal_single_turn_single_function", {"accuracy": 0, "total_count": 0})  # updated
-        normal_sp = value.get("data_normal_single_turn_parallel_function", {"accuracy": 0, "total_count": 0})  # updated
-        normal_ms = value.get("data_normal_multi_turn_user_switch", {"accuracy": 0, "total_count": 0})  # updated
-        normal_ma = value.get("data_normal_multi_turn_user_adjust", {"accuracy": 0, "total_count": 0})  # updated
-        normal_similar = value.get("data_normal_similar_api", {"accuracy": 0, "total_count": 0})  # updated
-        normal_profile = value.get("data_normal_preference", {"accuracy": 0, "total_count": 0})  # updated
+        normal_ss = value.get(
+            "data_normal_single_turn_single_function", {"accuracy": 0, "total_count": 0}
+        )  # updated
+        normal_sp = value.get(
+            "data_normal_single_turn_parallel_function",
+            {"accuracy": 0, "total_count": 0},
+        )  # updated
+        normal_ms = value.get(
+            "data_normal_multi_turn_user_switch", {"accuracy": 0, "total_count": 0}
+        )  # updated
+        normal_ma = value.get(
+            "data_normal_multi_turn_user_adjust", {"accuracy": 0, "total_count": 0}
+        )  # updated
+        normal_similar = value.get(
+            "data_normal_similar_api", {"accuracy": 0, "total_count": 0}
+        )  # updated
+        normal_profile = value.get(
+            "data_normal_preference", {"accuracy": 0, "total_count": 0}
+        )  # updated
 
-        agent_turn = value.get("data_agent_multi_turn", {"accuracy": 0, "process_accuracy": 0, "total_count": 0})
-        agent_step = value.get("data_agent_multi_step", {"accuracy": 0, "process_accuracy": 0, "total_count": 0})
-        
+        agent_turn = value.get(
+            "data_agent_multi_turn",
+            {"accuracy": 0, "process_accuracy": 0, "total_count": 0},
+        )
+        agent_step = value.get(
+            "data_agent_multi_step",
+            {"accuracy": 0, "process_accuracy": 0, "total_count": 0},
+        )
+
         special_total = calculate_unweighted_accuracy(
             [unusal_lose, unusal_error, unusal_exceeding]
         )
-        
+
         normal_total = calculate_unweighted_accuracy(
-            [normal_ss, normal_sp, normal_ms, normal_ma, normal_similar, normal_profile, atom_bool, atom_enum, atom_number, atom_list, atom_object_deep, atom_object_short]
+            [
+                normal_ss,
+                normal_sp,
+                normal_ms,
+                normal_ma,
+                normal_similar,
+                normal_profile,
+                atom_bool,
+                atom_enum,
+                atom_number,
+                atom_list,
+                atom_object_deep,
+                atom_object_short,
+            ]
         )
 
-        agent_total = calculate_unweighted_accuracy(
-            [agent_turn, agent_step]
-        )
+        agent_total = calculate_unweighted_accuracy([agent_turn, agent_step])
 
         atom_total = calculate_unweighted_accuracy(
-            [atom_bool, atom_enum, atom_number, atom_list, atom_object_deep, atom_object_short]
+            [
+                atom_bool,
+                atom_enum,
+                atom_number,
+                atom_list,
+                atom_object_deep,
+                atom_object_short,
+            ]
         )
 
-        singal_turn_total = calculate_unweighted_accuracy(
-            [normal_ss, normal_sp]
-        )
-        
-        multi_turn_total = calculate_unweighted_accuracy(
-            [normal_ms, normal_ma]
-        )
+        singal_turn_total = calculate_unweighted_accuracy([normal_ss, normal_sp])
 
-        summary = special_total["accuracy"] * 0.2676 + normal_total["accuracy"] * 0.578 + agent_total["accuracy"] * 0.1545
+        multi_turn_total = calculate_unweighted_accuracy([normal_ms, normal_ma])
+
+        summary = (
+            special_total["accuracy"] * 0.2676
+            + normal_total["accuracy"] * 0.578
+            + agent_total["accuracy"] * 0.1545
+        )
         summary = round(summary, 3)
 
         if model_name in closed_model_list:
@@ -286,7 +376,7 @@ def generate_result_csv(leaderboard_table, output_path):
     wb = Workbook()
     ws = wb.active
 
-    data.insert(0, COLUMNS)  
+    data.insert(0, COLUMNS)
 
     for i, row in enumerate(data):
         for j, value in enumerate(row):
@@ -295,6 +385,7 @@ def generate_result_csv(leaderboard_table, output_path):
 
     filepath = os.path.join(output_path, "result.xlsx")
     wb.save(filepath)
+
 
 def collapse_json_objects(file_path):
     with open(file_path, "r") as file:
@@ -311,7 +402,7 @@ def collapse_json_objects(file_path):
         elif char == "}":
             depth -= 1
             if depth == 0:
-                obj = content[obj_start: i + 1]
+                obj = content[obj_start : i + 1]
                 objects.append(obj)
 
     with open(file_path, "w") as out_file:
@@ -320,11 +411,16 @@ def collapse_json_objects(file_path):
             compact_json = json.dumps(json_obj, separators=(",", ":"))
             out_file.write(compact_json + "\n")
 
+
 def convert_answer(answer):
     if answer == "":
         return answer
-    result = [f"{key}({', '.join([f'{k}={v}' if isinstance(v, str) else f'{k}={v}' for k, v in value.items()])})" for key, value in answer.items()]
+    result = [
+        f"{key}({', '.join([f'{k}={v}' if isinstance(v, str) else f'{k}={v}' for k, v in value.items()])})"
+        for key, value in answer.items()
+    ]
     return result
+
 
 def convert_result_to_excel(model_name, category, paths):
     INPUT_PATH = paths["INPUT_PATH"]
@@ -335,12 +431,12 @@ def convert_result_to_excel(model_name, category, paths):
         language = "zh"
     else:
         language = "en"
-    
+
     prompt_file = build_data_path(PROMPT_PATH, category)
     answer_file = build_data_path(POSSIBLE_ANSWER_PATH, category)
     result_file = build_result_path(INPUT_PATH, model_name, category, "_result.json")
     score_file = build_result_path(SCORE_PATH, model_name, category, "_score.json")
-   
+
     prompt_list = []
     with open(prompt_file, "r", encoding="utf-8") as f:
         for line in f:
@@ -356,29 +452,41 @@ def convert_result_to_excel(model_name, category, paths):
                 profile = data["profile"]
             functions = data["function"]
             question = data["question"]
-            function_prompt = ''
+            function_prompt = ""
             for function in functions:
                 function_prompt = function_prompt + str(function) + "\n"
             if language == "zh":
                 if "special" in category:
-                    system_prompt = SYSTEM_PROMPT_FOR_SPECIAL_DATA_ZH.format(time=time, function=functions)
+                    system_prompt = SYSTEM_PROMPT_FOR_SPECIAL_DATA_ZH.format(
+                        time=time, function=functions
+                    )
                 elif "preference" in category:
-                    system_prompt = SYSTEM_PROMPT_FOR_PREFERENCE_DATA_ZH.format(profile=profile, function=functions)
+                    system_prompt = SYSTEM_PROMPT_FOR_PREFERENCE_DATA_ZH.format(
+                        profile=profile, function=functions
+                    )
                 else:
-                    system_prompt = SYSTEM_PROMPT_FOR_NORMAL_DATA_ZH.format(time=time, function=functions)
+                    system_prompt = SYSTEM_PROMPT_FOR_NORMAL_DATA_ZH.format(
+                        time=time, function=functions
+                    )
                 user_prompt = USER_PROMPT_ZH.format(question=question)
             elif language == "en":
                 if "special" in category:
-                    system_prompt = SYSTEM_PROMPT_FOR_SPECIAL_DATA_EN.format(time=time, function=functions)
+                    system_prompt = SYSTEM_PROMPT_FOR_SPECIAL_DATA_EN.format(
+                        time=time, function=functions
+                    )
                 elif "preference" in category:
-                    system_prompt = SYSTEM_PROMPT_FOR_PREFERENCE_DATA_EN.format(profile=profile, function=functions)
+                    system_prompt = SYSTEM_PROMPT_FOR_PREFERENCE_DATA_EN.format(
+                        profile=profile, function=functions
+                    )
                 else:
-                    system_prompt = SYSTEM_PROMPT_FOR_NORMAL_DATA_EN.format(time=time, function=functions)
+                    system_prompt = SYSTEM_PROMPT_FOR_NORMAL_DATA_EN.format(
+                        time=time, function=functions
+                    )
                 user_prompt = USER_PROMPT_EN.format(question=question)
 
             prompt = system_prompt + "\n" + user_prompt
             prompt_list.append({"id": id, "prompt": prompt, "question": question})
-    
+
     with open(answer_file, "r", encoding="utf-8") as f:
         for index, line in enumerate(f):
             data = json.loads(line)
@@ -400,21 +508,21 @@ def convert_result_to_excel(model_name, category, paths):
             data = json.loads(line)
             result = data["result"]
             prompt_list[index]["model_answer"] = result
-            prompt_list[index]["flag"] = 'true'
+            prompt_list[index]["flag"] = "true"
             prompt_list[index]["error_reason"] = ""
 
     with open(score_file, "r", encoding="utf-8") as f:
         for index, line in enumerate(f):
             if index >= 1:
                 data = json.loads(line)
-                prompt_list[index - 1]["flag"] = 'false'
+                prompt_list[index - 1]["flag"] = "false"
                 prompt_list[index - 1]["error_reason"] = data["error"]
 
     df = pd.DataFrame(prompt_list)
 
-    if language == 'zh':
+    if language == "zh":
         folder_path = "../result_excel/zh/" + model_name
-    elif language == 'en':
+    elif language == "en":
         folder_path = "../result_excel/en/" + model_name
     save_path = folder_path + "/data_" + category + ".xlsx"
     if not os.path.exists(folder_path):
@@ -422,9 +530,10 @@ def convert_result_to_excel(model_name, category, paths):
         os.makedirs(folder_path)
     df.to_excel(save_path, index=False)
 
+
 def merge_result(folder_path):
     # Get all Excel files in the folder
-    excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
+    excel_files = [f for f in os.listdir(folder_path) if f.endswith(".xlsx")]
 
     # List to store data from all files
     all_data = []
@@ -435,7 +544,7 @@ def merge_result(folder_path):
             file_path = os.path.join(folder_path, file)
             df = pd.read_excel(file_path)  # Read Excel file
             all_data.append(df)
-            
+
     for file in excel_files:
         if "special" in file or "similar" in file:
             file_path = os.path.join(folder_path, file)
