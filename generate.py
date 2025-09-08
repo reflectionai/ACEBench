@@ -1,205 +1,203 @@
+"""Entrypoint for ACEBench."""
 
-import argparse, json, os
+import json
+import os
+from concurrent import futures
+from pathlib import Path
+from typing import Mapping, Any, Iterable
+import logging
+
+
+from absl import flags, app
 from tqdm import tqdm
+
+import category as category_lib
 from model_inference.inference_map import inference_map
-from category import ACE_DATA_CATEGORY
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-def get_args():
+logger = logging.getLogger(__name__)
 
-    parser = argparse.ArgumentParser()
-    # Model name
-    parser.add_argument("--model", type=str, default="gpt-4o", nargs="+", help="Name of the model(s) to use")
-
-    # For local models, specify the model path
-    parser.add_argument("--model-path", type=str, help="Path to the model for local models")
-
-    # Category of the model you want to test, default is "all"
-    parser.add_argument("--category", type=str, default="test_all", nargs="+", help="Category of the model you want to test")
-
-    # Temperature parameter to control randomness of model output, default is 0.7
-    parser.add_argument("--temperature", type=float, default=0.7, help="Temperature parameter to control randomness of model output")
-    # Top-p parameter to control diversity of model output, default is 1
-    parser.add_argument("--top-p", type=float, default=1, help="Top-p parameter to control diversity of model output")
-    # Maximum number of tokens to generate, default is 1200
-    parser.add_argument("--max-tokens", type=int, default=1200, help="Maximum number of tokens to generate")
-    # Number of GPUs to use, default is 1
-    parser.add_argument("--num-gpus", default=1, type=int, help="Number of GPUs to use")
-    # GPU memory utilization rate, default is 0.9
-    parser.add_argument("--gpu-memory-utilization", default=0.9, type=float, help="GPU memory utilization rate")
-    # Language for model output, choose 'en' for English or 'zh' for Chinese
-    parser.add_argument("--language", type=str, default="en", choices=["en", "zh"], help="Language for model output, choose 'en' for English or 'zh' for Chinese")
-    # Number of threads to use for concurrency, default is 1
-    parser.add_argument("--num-threads", type=int, default=1, help="Number of threads to use for concurrency")
-    # Maximum number of dialog turns allowed for agent interactions
-    parser.add_argument("--max-dialog-turns", type=int, default=40, help="Maximum number of dialog turns allowed for agent interactions")
-    # Model used by the user role in the agent, it is recommended to use an advanced large model
-    parser.add_argument("--user-model", type=str, default="gpt-4o", help="Model used by the user role in the agent")
-    args = parser.parse_args()
-    return args
+RESULT_PATHS = {
+    "zh": Path("result_all/result_zh/"),
+    "en": Path("result_all/result_en/"),
+}
+DATA_PATHS = {"zh": Path("data_all/data_zh/"), "en": Path("data_all/data_en/")}
 
 
+FLAGS = flags.FLAGS
 
-def load_test_cases(base_path, filenames):
-    cases = []
-    
-    for filename in filenames:
-        file_path = os.path.join(base_path, filename)
+flags.DEFINE_list("model", ["gpt-4o"], "Name of the model(s) to use.")
+flags.DEFINE_string("model_path", None, "Path to the model for local models.")
+flags.DEFINE_string("user_model", "gpt-4o", "Model used by the user role in the agent.")
+flags.DEFINE_list("category", ["test_all"], "Category of the model you want to test.")
+flags.DEFINE_float(
+    "temperature", 0.7, "Temperature parameter to control randomness of model output."
+)
+flags.DEFINE_float(
+    "top_p", 1.0, "Top-p parameter to control diversity of model output."
+)
+flags.DEFINE_integer("max_tokens", 1200, "Maximum number of tokens to generate.")
+flags.DEFINE_integer("num_gpus", 1, "Number of GPUs to use.")
+flags.DEFINE_float("gpu_memory_utilization", 0.9, "GPU memory utilization rate.")
+flags.DEFINE_string(
+    "language",
+    "en",
+    "Language for model output, choose 'en' for English or 'zh' for Chinese.",
+)
+flags.DEFINE_integer("num_threads", 5, "Number of threads to use for concurrency.")
+flags.DEFINE_integer(
+    "max_dialog_turns",
+    40,
+    "Maximum number of dialog turns allowed for agent interactions.",
+)
+flags.register_validator(
+    "language",
+    (lambda lang: lang in DATA_PATHS),
+    message="Language must be 'en' or 'zh'.",
+)
+
+
+def load_test_cases(test_files: [Path]) -> list[object]:
+    """Load test cases."""
+    cases: list[Mapping[str, Any]] = []
+    for file_path in test_files:
         try:
-            with open(file_path, 'r', encoding='utf-8') as file:
+            with file_path.open(encoding="utf-8") as file:
                 cases.extend(json.loads(line) for line in file)
         except FileNotFoundError:
-            print(f"Error: File not found - {file_path}")
-        except json.JSONDecodeError:
-            print(f"Error: Failed to parse JSON in file - {file_path}")
+            logger.error(f"Missing test file: {file_path}")
+        except json.JSONDecodeError as err:
+            logger.error(f"Malformed JSON in {file_path}: {err}")
     return cases
 
 
 def sort_json(file):
+    """Sort json."""
     data = []
-    with open(file,'r', encoding='utf-8') as f:
+    with open(file, "r", encoding="utf-8") as f:
         for line in f:
             data.append(json.loads(line))
     if "multi_turn" in file and "agent" not in file:
         data = sorted(data, key=lambda x: tuple(map(int, x["id"].split("_")[-2:])))
     else:
         data = sorted(data, key=lambda x: int(x["id"].split("_")[-1]))
-    with open(file, 'w', encoding='utf-8') as f:
+    with open(file, "w", encoding="utf-8") as f:
         for entry in data:
             json.dump(entry, f, ensure_ascii=False)
-            f.write('\n')  
+            f.write("\n")
 
-def generate_singal(args, model_name, test_case):
-    model_path = args.model_path 
-    result_path = args.result_path
-    model_inference = inference_map[model_name](model_name, model_path, args.temperature, args.top_p, args.max_tokens, args.max_dialog_turns, args.user_model, args.language)
 
-    if "agent" in test_case["id"]:
-        id, question, functions = (
-                    test_case["id"],
-                    test_case["question"],
-                    test_case["function"],
-                )
-        if isinstance(functions, (dict, str)):
-            functions = [functions]
-        time = ""
-        profile = ""
-        result, process_list = model_inference.inference(question, functions, time, profile,test_case, id)
-        result_to_write = {
-            "id": id,
-            "result": result,
-            "process": process_list
-        }
-        model_inference.write_result(result_to_write, model_name, result_path)
+def generate_signal(model_name: str, test_case: dict[str, object]):
+    """Generate Signal."""
+    model_inference = inference_map[model_name](
+        model_name,
+        FLAGS.model_path,
+        FLAGS.temperature,
+        FLAGS.top_p,
+        FLAGS.max_tokens,
+        FLAGS.max_dialog_turns,
+        FLAGS.user_model,
+        FLAGS.language,
+    )
+    result_path = RESULT_PATHS[FLAGS.language]
 
-    elif "preference" in test_case["id"]:
-        id, question, functions, profile = (
-                    test_case["id"],
-                    test_case["question"],
-                    test_case["function"],
-                    test_case["profile"],
-                )
-        time = ""
-        if isinstance(functions, (dict, str)):
-            functions = [functions]
+    test_id = test_case["id"]
+    question = test_case["question"]
+    functions = test_case["function"]
+    time = test_case.get("time", "")
+    profile = test_case.get("profile", "")
+    if isinstance(functions, (dict, str)):
+        functions = [functions]
 
-        result = model_inference.inference(question, functions, time, profile, test_case, id)
-
-        result_to_write = {
-            "id": id,
-            "result": result,
-        }
-        model_inference.write_result(result_to_write, model_name, result_path)
-    
+    if "agent" in test_id:
+        result, process = model_inference.inference(
+            question, functions, time, profile, test_case, test_id
+        )
+        result_to_write = {"id": test_id, "result": result, "process": process}
     else:
-        id, question, functions, time = (
-                    test_case["id"],
-                    test_case["question"],
-                    test_case["function"],
-                    test_case["time"],
-                )
-        profile = ""
-        if isinstance(functions, (dict, str)):
-            functions = [functions]
+        result = model_inference.inference(
+            question, functions, time, profile, test_case, test_id
+        )
+        result_to_write = {"id": test_id, "result": result}
 
-        result = model_inference.inference(question, functions, time, profile, test_case, id)
+    print("Done inference. writing result to: ", result_path)
 
-        result_to_write = {
-            "id": id,
-            "result": result,
-        }
-        model_inference.write_result(result_to_write, model_name, result_path)
+    model_inference.write_result(result_to_write, model_name, result_path)
 
-def generate_results(args, model_name, test_case, completed_id_set):
-    with ThreadPoolExecutor(max_workers = args.num_threads) as executor:
-        futures = []
-        for test_case in test_cases_total:
-            if test_case["id"] not in completed_id_set:
-                future = executor.submit(generate_singal, args, model_name, test_case)
-                futures.append(future)
 
-        with tqdm(total=len(futures), desc="Processing Tasks", leave=True) as pbar:
-            for future in as_completed(futures):
+def generate_results(
+    model_name: str, test_cases: list[Mapping[str, Any]], completed_ids: set[str]
+) -> None:
+    """Runs inference for the given 'model_name' and write to corresponding result file."""
+
+    with futures.ThreadPoolExecutor(max_workers=FLAGS.num_threads) as executor:
+        futures_list = [
+            executor.submit(generate_signal, model_name, test_case)
+            for test_case in test_cases
+            if test_case["id"] not in completed_ids
+        ]
+
+        with tqdm(total=len(futures_list), desc="Processing Tasks", leave=True) as pbar:
+            for future in futures.as_completed(futures_list):
                 try:
-                    result = future.result()  # Catch exceptions in tasks
+                    future.result()  # Catch exceptions in tasks
                     pbar.update(1)
                 except Exception as e:
-                    print(f"Task raised an exception: {e}")
+                    logging.exception("Task raised an exception: %s", e)
                     # You can choose whether to continue executing tasks after catching an exception, or to terminate the program
                     raise
-        print("All tasks have been completed.")
 
 
+def get_result_filepath(folder_path: str, test_name: str):
+    """Simple formatting helper for result file name for the given test."""
+    filename = f"data_{test_name}_result.json"
+    return os.path.join(folder_path, filename)
 
- 
-if __name__ == "__main__":
+
+def collect_completed_test_ids(
+    test_names: Iterable[str], result_path: Path
+) -> set[str]:
+    """Gather list of test IDs that has already been generated."""
+    completed_ids = set()
+    for test_name in test_names:
+        file_path = result_path / f"data_{test_name}_result.json"
+        if not file_path.exists():
+            continue
+        with open(file_path, encoding="utf-8") as f:
+            for line in f:
+                completed_ids.add(json.loads(line)["id"])
+
+    return completed_ids
 
 
-    args = get_args()
+def main(argv: list[str]):
+    """Main."""
+    del argv  # unused although it's needed for app.run
 
-    if type(args.model) is not list:
-        args.model = [args.model]
-    if type(args.category) is not list:
-        args.category = [args.category]
-
-    
-    paths = {
-        "zh": {"data_path": "./data_all/data_zh/", "result_path": "./result_all/result_zh/"},
-        "en": {"data_path": "./data_all/data_en/", "result_path": "./result_all/result_en/"},
+    data_path: Path = DATA_PATHS[FLAGS.language]
+    result_path: Path = RESULT_PATHS[FLAGS.language]
+    test_names = {
+        test_name
+        for category in FLAGS.category
+        for test_name in category_lib.ACE_DATA_CATEGORY[category]
     }
 
-    data_path = paths[args.language]["data_path"]
-    result_path = paths[args.language]["result_path"]
-    args.result_path = result_path
+    for model_name in FLAGS.model:
+        model_path = result_path / model_name
+        model_path.mkdir(parents=True, exist_ok=True)
 
-    # Get the filenames of the test cases
-    test_names = {test_name for category in args.category for test_name in ACE_DATA_CATEGORY[category]}
-    test_files = [f"data_{test_name}.json" for test_name in test_names]
+        completed_ids = collect_completed_test_ids(test_names, model_path)
 
-    for model_name in args.model:
-        folder_path = os.path.join(result_path, model_name)
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-
-        completed_id_set = set()
-        # Count the cases that have already been generated to avoid duplication
-        for file in test_names:
-            file_name = f"data_{file}_result.json"
-            file_path = os.path.join(folder_path, file_name)
-            if os.path.exists(file_path):
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        line_data = json.loads(line)
-                        completed_id_set.add(line_data["id"])
-        # Read data
-        test_cases_total = load_test_cases(data_path, test_files)
+        test_files = [data_path / f"data_{test_name}.json" for test_name in test_names]
+        test_cases_total = load_test_cases(test_files)
 
         if len(test_cases_total) > 0:
-            generate_results(args, model_name, test_cases_total, completed_id_set)
-        
+            generate_results(model_name, test_cases_total, completed_ids)
+
         # Multithreading may disrupt the order of execution, so the result ids need to be reordered
-        for file in test_names:
-            file_name = f"data_{file}_result.json"
-            file_path = os.path.join(folder_path, file_name)
-            sort_json(file_path)
+        for test_name in test_names:
+            sort_json(get_result_filepath(model_path, test_name))
+
+
+if __name__ == "__main__":
+    app.run(main)
