@@ -3,6 +3,7 @@
 import sys
 import os
 import json
+from pathlib import Path
 
 from absl import flags, app
 from model_eval import checker as eval_checker
@@ -10,6 +11,7 @@ from model_eval import utils as eval_utils
 from model_eval import evaluation_helper as eval_helper
 from category import ACE_DATA_CATEGORY
 from model_inference.utils import decode_ast
+
 
 sys.path.append("../")
 RESULT_TABLE = {}
@@ -26,6 +28,25 @@ flags.DEFINE_list("model", ["gpt-4o"], "A list of model names to evaluate.")
 flags.DEFINE_list(
     "category", ["test_all"], "A list of test categories to run the evaluation on."
 )
+
+
+def get_paths(language: str):
+    """Get Paths."""
+    base_paths = {
+        "zh": {
+            "INPUT_PATH": Path("result_all/result_zh/"),
+            "PROMPT_PATH": Path("data_all/data_zh/"),
+            "POSSIBLE_ANSWER_PATH": Path("data_all/data_zh/possible_answer/"),
+            "OUTPUT_PATH": Path("score_all/score_zh/"),
+        },
+        "en": {
+            "INPUT_PATH": Path("result_all/result_en/"),
+            "PROMPT_PATH": Path("data_all/data_en/"),
+            "POSSIBLE_ANSWER_PATH": Path("data_all/data_en/possible_answer/"),
+            "OUTPUT_PATH": Path("score_all/score_en/"),
+        },
+    }
+    return base_paths[language]
 
 
 def normal_single_turn_eval(
@@ -128,9 +149,11 @@ def normal_single_turn_eval(
     )
 
     output_filename = "data_" + test_category + "_score.json"
-    output_file_dir = os.path.join(paths["OUTPUT_PATH"], model_name)
+    output_file_dir = paths["OUTPUT_PATH"] / model_name
     eval_utils.save_score_as_json(output_filename, eval_result, output_file_dir)
-    eval_helper.convert_result_to_excel(model_name, test_category, paths)
+    eval_helper.convert_result_to_excel(
+        model_name, test_category, paths, FLAGS.language
+    )
     return accuracy
 
 
@@ -283,9 +306,11 @@ def normal_multi_turn_eval(
     )
 
     output_file_name = "data_" + test_category + "_score.json"
-    output_file_dir = os.path.join(paths["OUTPUT_PATH"], model_name)
+    output_file_dir = paths["OUTPUT_PATH"] / model_name
     eval_utils.save_score_as_json(output_file_name, eval_result, output_file_dir)
-    eval_helper.convert_result_to_excel(model_name, test_category, paths)
+    eval_helper.convert_result_to_excel(
+        model_name, test_category, paths, FLAGS.language
+    )
     return end_accuracy
 
 
@@ -299,9 +324,6 @@ def special_eval(model_results, prompts, possible_answers, category, model_name,
             "for completeness."
         )
 
-    print("[special_eval] model_results: ", len(model_results))
-    print("[special_eval] prompt list: ", len(prompts))
-    print("[special_eval] possible_answers: ", len(possible_answers))
     wrong_list = []
     correct_count = 0
     eval_result = []
@@ -394,9 +416,9 @@ def special_eval(model_results, prompts, possible_answers, category, model_name,
         },
     )
     output_file_name = "data_" + category + "_score.json"
-    output_file_dir = os.path.join(paths["OUTPUT_PATH"], model_name)
+    output_file_dir = paths["OUTPUT_PATH"] / model_name
     eval_utils.save_score_as_json(output_file_name, wrong_list, output_file_dir)
-    eval_helper.convert_result_to_excel(model_name, category, paths)
+    eval_helper.convert_result_to_excel(model_name, category, paths, FLAGS.language)
     return accuracy
 
 
@@ -472,14 +494,16 @@ def agent_eval(
         },
     )
     output_file_name = "data_" + test_category + "_score.json"
-    output_file_dir = os.path.join(paths["OUTPUT_PATH"], model_name)
+    output_file_dir = paths["OUTPUT_PATH"] / model_name
     eval_utils.save_score_as_json(output_file_name, result, output_file_dir)
+    # TODO(sabina): missing export to excel.
     return accuracy, process_accuracy
 
 
 def agent_eval_process(
     model_name, model_results, possible_answers, test_category, correct_list, language
 ):
+    """Agent Eval Process."""
     individual_accuracies = []  # Used to store the accuracy of each data point
     total_accuracy = 0  # Store the total accuracy of all data
 
@@ -601,104 +625,86 @@ def agent_eval_process(
     return overall_accuracy
 
 
+def run_eval(model_name, category, paths, language):
+    """Run evaluation for the model given the category."""
+    # str legacy helper.
+    model_result_path = eval_utils.build_result_path(
+        paths["INPUT_PATH"], model_name, category, "_result.json"
+    )
+    model_results = eval_helper.load_file(model_result_path)
+    prompt_path = eval_utils.build_data_path(paths["PROMPT_PATH"], category)
+    prompt = eval_helper.load_file(prompt_path)
+    possible_answer_path = eval_utils.build_data_path(
+        paths["POSSIBLE_ANSWER_PATH"], category
+    )
+    possible_answers = eval_helper.load_file(possible_answer_path)
+
+    if "special" in category:
+        accuracy = special_eval(
+            model_results,
+            prompt,
+            possible_answers,
+            category,
+            model_name,
+            paths,
+        )
+        print(
+            f"Model: {model_name} | ✔️ Test '{category}' is done! "
+            f"🚀 Accuracy: {accuracy}."
+        )
+    elif "agent" in category:
+        end_accuracy, process_accuracy = agent_eval(
+            model_results,
+            prompt,
+            possible_answers,
+            category,
+            model_name,
+            language,
+            paths,
+        )
+        print(
+            f"Model: {model_name} | ✔️ Test '{category}' is done! | "
+            f"End_to_End Accuracy: {end_accuracy} | Process Accuracy: "
+            f"{process_accuracy}"
+        )
+    elif "normal_multi_turn" in category:
+        end_accuracy = normal_multi_turn_eval(
+            model_results,
+            prompt,
+            possible_answers,
+            category,
+            model_name,
+            paths,
+        )
+        print(
+            f"Model: {model_name} | ✔️ Test '{category}' is done! | "
+            f"Accuracy: {end_accuracy}"
+        )
+    else:
+        accuracy = normal_single_turn_eval(
+            model_results,
+            prompt,
+            possible_answers,
+            category,
+            model_name,
+            paths,
+        )
+        print(
+            f"Model: {model_name} | ✔️ Test '{category}' is done! | Accuracy: {accuracy}"
+        )
+
+
 def runner(model_names, categories, paths, language):
     """Main runner function."""
     for model_name in model_names:
         for category in categories:
             print(f"🔍 Running test: {category}")
+            run_eval(model_name, category, paths, language)
 
-            model_result_path = eval_utils.build_result_path(
-                paths["INPUT_PATH"], model_name, category, "_result.json"
-            )
-            model_results = eval_helper.load_file(model_result_path)
-
-            prompt_path = eval_utils.build_data_path(paths["PROMPT_PATH"], category)
-            prompt = eval_helper.load_file(prompt_path)
-
-            possible_answer_path = eval_utils.build_data_path(
-                paths["POSSIBLE_ANSWER_PATH"], category
-            )
-            possible_answers = eval_helper.load_file(possible_answer_path)
-
-            if "special" in category:
-                accuracy = special_eval(
-                    model_results,
-                    prompt,
-                    possible_answers,
-                    category,
-                    model_name,
-                    paths,
-                )
-                print(
-                    f"Model: {model_name} | ✔️ Test '{category}' is done! "
-                    f"🚀 Accuracy: {accuracy}."
-                )
-
-            elif "agent" in category:
-                end_accuracy, process_accuracy = agent_eval(
-                    model_results,
-                    prompt,
-                    possible_answers,
-                    category,
-                    model_name,
-                    language,
-                    paths,
-                )
-                print(
-                    f"Model: {model_name} | ✔️ Test '{category}' is done! | "
-                    f"End_to_End Accuracy: {end_accuracy} | Process Accuracy: "
-                    f"{process_accuracy}"
-                )
-
-            elif "normal_multi_turn" in category:
-                end_accuracy = normal_multi_turn_eval(
-                    model_results,
-                    prompt,
-                    possible_answers,
-                    category,
-                    model_name,
-                    paths,
-                )
-                print(
-                    f"Model: {model_name} | ✔️ Test '{category}' is done! | "
-                    f"Accuracy: {end_accuracy}"
-                )
-
-            else:
-                accuracy = normal_single_turn_eval(
-                    model_results,
-                    prompt,
-                    possible_answers,
-                    category,
-                    model_name,
-                    paths,
-                )
-                print(
-                    f"Model: {model_name} | ✔️ Test '{category}' is done! | "
-                    f"Accuracy: {accuracy}"
-                )
-
-    eval_helper.update_result_table_with_score_file(RESULT_TABLE, paths["OUTPUT_PATH"])
-    eval_helper.generate_result_csv(RESULT_TABLE, paths["OUTPUT_PATH"])
-
-
-def get_paths(language):
-    """Get Paths."""
-    base_paths = {
-        "zh": {
-            "INPUT_PATH": "./result_all/result_zh/",
-            "PROMPT_PATH": "./data_all/data_zh/",
-            "POSSIBLE_ANSWER_PATH": "./data_all/data_zh/possible_answer/",
-            "OUTPUT_PATH": "./score_all/score_zh/",
-        },
-        "en": {
-            "INPUT_PATH": "./result_all/result_en/",
-            "PROMPT_PATH": "./data_all/data_en/",
-            "POSSIBLE_ANSWER_PATH": "./data_all/data_en/possible_answer/",
-            "OUTPUT_PATH": "./score_all/score_en/",
-        },
-    }
-    return base_paths.get(language)
+    eval_helper.update_result_table_with_score_file(
+        RESULT_TABLE, str(paths["OUTPUT_PATH"])
+    )
+    eval_helper.generate_result_csv(RESULT_TABLE, str(paths["OUTPUT_PATH"]))
 
 
 def main(argv: list[str]):

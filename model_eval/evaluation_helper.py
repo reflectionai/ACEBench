@@ -2,13 +2,14 @@ import glob
 import json
 import os
 import pandas as pd
+from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
 
-from model_eval.utils import *
+from model_eval import utils as eval_utils
 from model_eval.checker import *
-from model_inference.prompt_en import *
-from model_inference.prompt_zh import *
+from model_inference import prompt_en
+from model_inference import prompt_zh
 
 REST_API_GROUND_TRUTH_FILE_PATH = "api_status_check_ground_truth_REST.json"
 EXECTUABLE_API_GROUND_TRUTH_FILE_PATH = "api_status_check_ground_truth_executable.json"
@@ -149,7 +150,7 @@ def update_result_table_with_score_file(leaderboard_table, score_path):
     for subdir in subdirs:
         # Pattern to match JSON files in this subdirectory
         json_files_pattern = os.path.join(subdir, "*.json")
-        model_name = subdir.split(score_path)[1]
+        model_name = os.path.basename(subdir)
         # Find and process all JSON files in the subdirectory
         for model_score_json in glob.glob(json_files_pattern):
             if "process" not in model_score_json:
@@ -422,26 +423,27 @@ def convert_answer(answer):
     return result
 
 
-def convert_result_to_excel(model_name, category, paths):
-    INPUT_PATH = paths["INPUT_PATH"]
-    PROMPT_PATH = paths["PROMPT_PATH"]
-    POSSIBLE_ANSWER_PATH = paths["POSSIBLE_ANSWER_PATH"]
-    SCORE_PATH = paths["OUTPUT_PATH"]
-    if "zh" in INPUT_PATH:
-        language = "zh"
-    else:
-        language = "en"
+def convert_result_to_excel(model_name, category, paths: Path, language):
+    """Convert result for the given model and category into ../result_excel/."""
+    input_path = paths["INPUT_PATH"]
+    prompt_path = paths["PROMPT_PATH"]
+    possible_answer_path = paths["POSSIBLE_ANSWER_PATH"]
+    score_path = paths["OUTPUT_PATH"]
 
-    prompt_file = build_data_path(PROMPT_PATH, category)
-    answer_file = build_data_path(POSSIBLE_ANSWER_PATH, category)
-    result_file = build_result_path(INPUT_PATH, model_name, category, "_result.json")
-    score_file = build_result_path(SCORE_PATH, model_name, category, "_score.json")
+    prompt_file = eval_utils.build_data_path(prompt_path, category)
+    answer_file = eval_utils.build_data_path(possible_answer_path, category)
+    result_file = eval_utils.build_result_path(
+        input_path, model_name, category, "_result.json"
+    )
+    score_file = eval_utils.build_result_path(
+        score_path, model_name, category, "_score.json"
+    )
 
     prompt_list = []
     with open(prompt_file, "r", encoding="utf-8") as f:
         for line in f:
             data = json.loads(line)
-            id = data["id"]
+            prompt_id = data["id"]
             if "time" not in list(data.keys()):
                 time = ""
             else:
@@ -455,79 +457,87 @@ def convert_result_to_excel(model_name, category, paths):
             function_prompt = ""
             for function in functions:
                 function_prompt = function_prompt + str(function) + "\n"
+
+            system_prompt = ""
+            user_prompt = ""
             if language == "zh":
                 if "special" in category:
-                    system_prompt = SYSTEM_PROMPT_FOR_SPECIAL_DATA_ZH.format(
+                    system_prompt = prompt_zh.SYSTEM_PROMPT_FOR_SPECIAL_DATA_ZH.format(
                         time=time, function=functions
                     )
                 elif "preference" in category:
-                    system_prompt = SYSTEM_PROMPT_FOR_PREFERENCE_DATA_ZH.format(
-                        profile=profile, function=functions
+                    system_prompt = (
+                        prompt_zh.SYSTEM_PROMPT_FOR_PREFERENCE_DATA_ZH.format(
+                            profile=profile, function=functions
+                        )
                     )
                 else:
-                    system_prompt = SYSTEM_PROMPT_FOR_NORMAL_DATA_ZH.format(
+                    system_prompt = prompt_zh.SYSTEM_PROMPT_FOR_NORMAL_DATA_ZH.format(
                         time=time, function=functions
                     )
-                user_prompt = USER_PROMPT_ZH.format(question=question)
+                user_prompt = prompt_zh.USER_PROMPT_ZH.format(question=question)
             elif language == "en":
                 if "special" in category:
-                    system_prompt = SYSTEM_PROMPT_FOR_SPECIAL_DATA_EN.format(
+                    system_prompt = prompt_en.SYSTEM_PROMPT_FOR_SPECIAL_DATA_EN.format(
                         time=time, function=functions
                     )
                 elif "preference" in category:
-                    system_prompt = SYSTEM_PROMPT_FOR_PREFERENCE_DATA_EN.format(
-                        profile=profile, function=functions
+                    system_prompt = (
+                        prompt_en.SYSTEM_PROMPT_FOR_PREFERENCE_DATA_EN.format(
+                            profile=profile, function=functions
+                        )
                     )
                 else:
-                    system_prompt = SYSTEM_PROMPT_FOR_NORMAL_DATA_EN.format(
+                    system_prompt = prompt_en.SYSTEM_PROMPT_FOR_NORMAL_DATA_EN.format(
                         time=time, function=functions
                     )
-                user_prompt = USER_PROMPT_EN.format(question=question)
+                user_prompt = prompt_en.USER_PROMPT_EN.format(question=question)
 
             prompt = system_prompt + "\n" + user_prompt
-            prompt_list.append({"id": id, "prompt": prompt, "question": question})
+            prompt_list.append(
+                {"id": prompt_id, "prompt": prompt, "question": question}
+            )
 
     with open(answer_file, "r", encoding="utf-8") as f:
         for index, line in enumerate(f):
-            data = json.loads(line)
+            answer = json.loads(line)["ground_truth"]
             if "special" in category:
-                answer = data["ground_truth"]
+                continue
+            if isinstance(answer, list):
+                answer_list = []
+                for answer_item in answer:
+                    answer_list.append(convert_answer(answer_item))
+                prompt_list[index]["expected_answer"] = answer_list
             else:
-                answer = data["ground_truth"]
-                if isinstance(answer, list):
-                    answer_list = []
-                    for answer_item in answer:
-                        answer_list.append(convert_answer(answer_item))
-                    prompt_list[index]["excepted_answer"] = answer_list
-                else:
-                    answer = convert_answer(answer)
-                    prompt_list[index]["excepted_answer"] = answer
+                answer = convert_answer(answer)
+                prompt_list[index]["expected_answer"] = answer
 
     with open(result_file, "r", encoding="utf-8") as f:
         for index, line in enumerate(f):
-            data = json.loads(line)
-            result = data["result"]
+            result = json.loads(line)["result"]
             prompt_list[index]["model_answer"] = result
             prompt_list[index]["flag"] = "true"
             prompt_list[index]["error_reason"] = ""
 
     with open(score_file, "r", encoding="utf-8") as f:
         for index, line in enumerate(f):
-            if index >= 1:
-                data = json.loads(line)
-                prompt_list[index - 1]["flag"] = "false"
-                prompt_list[index - 1]["error_reason"] = data["error"]
+            if index < 1:
+                continue
+
+            data = json.loads(line)
+            prompt_list[index - 1]["flag"] = "false"
+            prompt_list[index - 1]["error_reason"] = data["error"]
 
     df = pd.DataFrame(prompt_list)
 
-    if language == "zh":
-        folder_path = "../result_excel/zh/" + model_name
-    elif language == "en":
-        folder_path = "../result_excel/en/" + model_name
-    save_path = folder_path + "/data_" + category + ".xlsx"
-    if not os.path.exists(folder_path):
-        # Create folder if it doesn't exist
-        os.makedirs(folder_path)
+    folder_path = Path("..", "result_excel", language, model_name)
+    # if language == "zh":
+    #     folder_path = Path("../result_excel/zh/") / model_name
+    # elif language == "en":
+    #     folder_path = Path("../result_excel/en/") / model_name
+    save_path = folder_path / f"data_{category}.xlsx"
+    # Create folder if it doesn't exist
+    folder_path.mkdir(parents=True, exist_ok=True)
     df.to_excel(save_path, index=False)
 
 
@@ -553,7 +563,7 @@ def merge_result(folder_path):
 
     # Merge all DataFrames
     merged_data = pd.concat(all_data, ignore_index=True)
-    model_name = folder_path.split("/")[-1]
+    model_name = (str(folder_path)).split("/")[-1]
     save_name = model_name + "_output.xlsx"
 
     # Write the merged data to a new Excel file

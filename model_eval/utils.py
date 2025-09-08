@@ -1,7 +1,7 @@
-
-import re 
+import re
 import os
 import json
+from pathlib import Path
 from collections import Counter
 
 
@@ -12,14 +12,13 @@ def calculate_average(numbers):
 
 
 def get_lose_param(text):
-
     # Use regular expressions to extract parameters and API names
-    params_match = re.search(r'\((.*?)\)', text)
-    api_match = re.findall(r'\(.*?\)', text)
+    params_match = re.search(r"\((.*?)\)", text)
+    api_match = re.findall(r"\(.*?\)", text)
 
     if params_match and api_match:
         # Extract parameters
-        params = params_match.group(1).split(', ')
+        params = params_match.group(1).split(", ")
         # Extract API name
         api_name = api_match[1][1:-1]  # Remove parentheses
 
@@ -36,16 +35,13 @@ def is_function_call_format_valid(decoded_output):
     return False
 
 
-
 def save_score_as_json(filename, data, subdir=None):
-
     # If a subdirectory is specified, ensure the subdirectory exists and construct the full file path
     if subdir:
         os.makedirs(subdir, exist_ok=True)
         filename = os.path.join(subdir, filename)
 
     def _find_and_warn_sets(d):
-
         for key, value in d.items():
             if isinstance(value, set):
                 print(f"Warning: Found a set in key '{key}', value: {value}")
@@ -78,12 +74,9 @@ def flatten_dates(d):
     return {k: v[0] if isinstance(v, list) and len(v) == 1 else v for k, v in d.items()}
 
 
-
 def standardize_string(input_string: str):
-
     regex_string = r"[ \,\.\/\-\_\*\^]"
     return re.sub(regex_string, "", input_string).lower().replace("'", '"')
-
 
 
 def calculate_average(numbers):
@@ -92,9 +85,7 @@ def calculate_average(numbers):
     return sum(numbers) / len(numbers)
 
 
-        
 def find_description(func_descriptions, name):
-
     if type(func_descriptions) == list:
         for func_description in func_descriptions:
             if func_description["name"] in name:
@@ -102,7 +93,8 @@ def find_description(func_descriptions, name):
         return None
     else:
         return func_descriptions
-    
+
+
 def find_function(model_output_item, possible_answers):
     fun_name = list(model_output_item.keys())[0]
     for possible_answer in possible_answers:
@@ -112,17 +104,14 @@ def find_function(model_output_item, possible_answers):
 
 
 def get_possible_answer_type(possible_answer):
-        
     if possible_answer != "":  # Optional parameter
         return type(possible_answer)
     return None
 
-def build_result_path(base_path, model_name, category, suffix=".json"):
-    file_name = f"data_{category}{suffix}"
-    return os.path.join(base_path, model_name, file_name)
+
+def build_result_path(base_path: Path, model_name, category, suffix=".json"):
+    return base_path / model_name / f"data_{category}{suffix}"
 
 
-def build_data_path(base_path, category, suffix=".json"):
-    file_name = f"data_{category}{suffix}"
-    return os.path.join(base_path, file_name)
-
+def build_data_path(base_path: Path, category, suffix=".json"):
+    return base_path / f"data_{category}{suffix}"
