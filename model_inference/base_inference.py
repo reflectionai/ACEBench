@@ -45,7 +45,6 @@ class BaseHandler:
             #     f"{result_path}{model_name}/data_{test_category}_result.json"
             # )
             model_path = model_dir / f"data_{test_category}_result.json"
-            print("Wiritng to: ", model_path)
             # with open(file_to_write, "a+", encoding="utf-8") as f:
             with model_path.open("a+", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")

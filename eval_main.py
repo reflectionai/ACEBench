@@ -500,6 +500,30 @@ def agent_eval(
     return accuracy, process_accuracy
 
 
+def get_accuracy_for_call_process(call_process, results):
+    result_len = len(results)
+    milestone_len = len(call_process)
+    result_indices = []
+    current_index = 0
+    # Iterate through each element in call_process and search sequentially
+    for stone in call_process:
+        # Start searching from the current index until the corresponding call_process element is found
+        while current_index < result_len:
+            if results[current_index].strip() == stone.strip():
+                result_indices.append(current_index)
+                current_index += 1
+                break
+            current_index += 1
+
+    # Calculate call_process accuracy using floating-point division
+    if milestone_len == 0:
+        # this is used for eval calculation
+        accuracy = 1.00
+    else:
+        accuracy = len(result_indices) / milestone_len
+    return accuracy
+
+
 def agent_eval_process(
     model_name, model_results, possible_answers, test_category, correct_list, language
 ):
@@ -518,81 +542,32 @@ def agent_eval_process(
         if isinstance(call_processes[0], list):
             max_accuracy = -1
             for call_process in call_processes:
-                result_len = len(result)
-                milestone_len = len(call_process)
-                result_indices = []
-                current_index = 0
-                # Iterate through each element in call_process and search sequentially
-                for stone in call_process:
-                    # Start searching from the current index until the corresponding call_process element is found
-                    while current_index < result_len:
-                        if result[current_index].strip() == stone.strip():
-                            result_indices.append(current_index)
-                            current_index += 1
-                            break
-                        current_index += 1
-
-                # Calculate call_process accuracy using floating-point division
-                if milestone_len == 0:
-                    accuracy = 1.00
-                else:
-                    accuracy = len(result_indices) / milestone_len
+                accuracy = get_accuracy_for_call_process(call_process, result)
                 rounded_accuracy = round(accuracy, 3)
                 if rounded_accuracy > max_accuracy:
                     max_accuracy = rounded_accuracy
                     name = test_category + "_" + str(i)
 
-            # Save the accuracy of each data point
-            if accuracy != 1.00:
-                individual_accuracies.append(
-                    {
-                        name: {
-                            "process_accuracy": rounded_accuracy,
-                            "model_output": result,
-                            "call_process": call_processes,
-                        }
-                    }
-                )
-            total_accuracy += max_accuracy
         # For a single answer, calculate directly
         else:
-            result_len = len(result)
-            milestone_len = len(call_processes)
-
-            result_indices = []
-            current_index = 0
-
-            # Iterate through each element in call_process and search sequentially
-            for stone in call_processes:
-                while current_index < result_len:
-                    if result[current_index].strip() == stone.strip():
-                        result_indices.append(current_index)
-                        current_index += 1  # Update position and continue searching for the next stone
-                        break
-                    current_index += 1
-
-            # Calculate call_process accuracy using floating-point division
-            if milestone_len == 0:
-                accuracy = 1.00
-            else:
-                accuracy = len(result_indices) / milestone_len
+            accuracy = get_accuracy_for_call_process(call_processes, result)
             rounded_accuracy = round(accuracy, 3)
-
-            # Save the accuracy of each data point
             name = test_category + "_" + str(i)
-            if accuracy != 1.00:
-                individual_accuracies.append(
-                    {
-                        name: {
-                            "process_accuracy": rounded_accuracy,
-                            "model_output": result,
-                            "call_process": call_processes,
-                        }
-                    }
-                )
 
-            # Accumulate total accuracy
-            total_accuracy += accuracy
+        # Save the accuracy of each data point
+        if accuracy != 1.00:
+            individual_accuracies.append(
+                {
+                    name: {
+                        "process_accuracy": rounded_accuracy,
+                        "model_output": result,
+                        "call_process": call_processes,
+                    }
+                }
+            )
+
+        # Accumulate total accuracy
+        total_accuracy += accuracy
 
     # Calculate the overall accuracy of all entries
     overall_accuracy = total_accuracy / len(model_results)

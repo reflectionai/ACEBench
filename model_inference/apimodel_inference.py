@@ -74,7 +74,6 @@ class APIModelInference(BaseHandler):
         self, question, functions, test_category, time, profile, id
     ):
         """Single Turn Inference."""
-        print("APIModel single turn Inference: ")
         if self.language == "zh":
             if "special" in test_category:
                 system_prompt = prompt_zh.SYSTEM_PROMPT_FOR_SPECIAL_DATA_ZH.format(
@@ -148,7 +147,6 @@ class APIModelInference(BaseHandler):
     def multi_turn_inference(
         self, question, initial_config, functions, involved_classes, test_id, time
     ):
-        print("APIModel multi-turn Inference: ")
         agent = APIAgent_turn(
             model_name=self.model_name,
             time=time,
@@ -221,7 +219,6 @@ class APIModelInference(BaseHandler):
     def multi_step_inference(
         self, question, initial_config, functions, involved_classes, test_id, time
     ):
-        print("APIModel multi-step Inference: ")
         agent = APIAgent_step(
             model_name=self.model_name, time=time, functions=functions
         )
