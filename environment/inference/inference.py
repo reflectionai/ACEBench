@@ -7,7 +7,7 @@ from openai import OpenAI
 from tqdm import tqdm
 from dotenv import load_dotenv
 import os
-
+from typing import Optional
 import re
 from model_inference.multi_turn.APIModel_agent import APIAgent_turn
 from model_inference.multi_turn.APIModel_user import APIUSER
@@ -18,25 +18,49 @@ from model_inference.multi_step.APIModel_agent import APIAgent_step
 from model_inference.multi_step.execution_role_step import EXECUTION_STEP
 
 SAVED_CLASS = {
-                "BaseApi": ["wifi","logged_in"],
-                "MessageApi": ["inbox"],
-                "ReminderApi": ["reminder_list"],
-                "FoodPlatform":["users","logged_in_users","orders"],
-                "Finance":["user_accounts", "is_logged_in","deposit_history","withdrawal_history","loan_history","orders","holdings"],
-                "Travel": ["users","reservations"],
-               }
+    "BaseApi": ["wifi", "logged_in"],
+    "MessageApi": ["inbox"],
+    "ReminderApi": ["reminder_list"],
+    "FoodPlatform": ["users", "logged_in_users", "orders"],
+    "Finance": [
+        "user_accounts",
+        "is_logged_in",
+        "deposit_history",
+        "withdrawal_history",
+        "loan_history",
+        "orders",
+        "holdings",
+    ],
+    "Travel": ["users", "reservations"],
+}
 
-
+OPEN_AI_KEY = "OPEN_AI_KEY"
 
 
 class APIModelInference(BaseHandler):
-    def __init__(self, model_name, model_path=None, temperature=0.001, top_p=1, max_tokens=1000, max_dialog_turns=40, user_model="gpt-4o", language="zh") -> None:
-        super().__init__(model_name, model_path, temperature, top_p, max_tokens, language)
+    """Inference helper with API calling capabilities."""
+
+    def __init__(
+        self,
+        model_name: str,
+        model_path: Optional[str] = None,
+        temperature: float = 0.001,
+        top_p: int = 1,
+        max_tokens: int = 1000,
+        max_dialog_turns: int = 40,
+        user_model: str = "gpt-4o",
+        language: str = "zh",
+    ) -> None:
+        super().__init__(
+            model_name, model_path, temperature, top_p, max_tokens, language
+        )
 
         load_dotenv()
+        api_key: Optional[str] = None
+        base_url: Optional[str] = None
 
         if "gpt" in self.model_name:
-            api_key = os.getenv("OPENAI_API_KEY")
+            api_key = os.getenv(OPEN_AI_KEY)
             # api_key = secrets.fetch_secret("OPENAI_API_KEY")
             base_url = os.getenv("GPT_BASE_URL")
         elif "deepseek-r1" in self.model_name:
@@ -45,65 +69,102 @@ class APIModelInference(BaseHandler):
         elif "o1" in self.model_name:
             api_key = os.getenv("GPT_AGENT_API_KEY")
             base_url = os.getenv("GPT_BASE_URL")
-            
+
         self.client = OpenAI(base_url=base_url, api_key=api_key)
         self.model_name = model_name
         self.max_dialog_turns = max_dialog_turns
         self.language = language
         self.user_model = user_model
 
-
-    def inference(self, question, functions, time, profile, test_case, id):
+    def inference(
+        self,
+        prompt_question: str,
+        prompt_function: str,
+        prompt_time: str,
+        prompt_profile: str,
+        test_case: dict[str, object],
+        test_name: str,
+    ):
         """Inference."""
-        category = id.rsplit("_", 1)[0]
-        if "agent" in category :
+        category: str = test_name.rsplit("_", 1)[0]
+        test_id: str = test_name.split("_")[-1]
+        if "agent" in category:
             initial_config = test_case["initial_config"]
             involved_classes = test_case["involved_classes"]
-            test_id = test_case["id"].split("_")[-1]
+
             if "multi_turn" in category:
-                result, process_list = self.multi_turn_inference(question, initial_config, functions, involved_classes, test_id, time)
+                result, process_list = self.multi_turn_inference(
+                    prompt_question,
+                    initial_config,
+                    prompt_function,
+                    involved_classes,
+                    test_id,
+                    prompt_time,
+                )
             elif "multi_step" in category:
-                result, process_list = self.multi_step_inference(question, initial_config, functions, involved_classes, test_id, time)
+                result, process_list = self.multi_step_inference(
+                    prompt_question,
+                    initial_config,
+                    prompt_function,
+                    involved_classes,
+                    test_id,
+                    prompt_time,
+                )
             return result, process_list
 
         else:
-            result = self.single_turn_inference(question, functions, category, time, profile, id)
+            result = self.single_turn_inference(
+                prompt_question,
+                prompt_function,
+                category,
+                prompt_time,
+                prompt_profile,
+                id,  # TODO(sabinakim) - is this intentional change?
+            )
             return result
 
     def single_turn_inference(
-        self, question, functions, test_category, time, profile, id
+        self,
+        prompt_question: str,
+        prompt_function: str,
+        test_category: str,
+        prompt_time: str,
+        prompt_profile: str,
+        prompt_id: str,
     ):
         """Single Turn Inference."""
+        system_prompt: str = ""
+        user_prompt: str = ""
         if self.language == "zh":
             if "special" in test_category:
                 system_prompt = prompt_zh.SYSTEM_PROMPT_FOR_SPECIAL_DATA_ZH.format(
-                    time=time, function=functions
+                    time=prompt_time, function=prompt_function
                 )
             elif "preference" in test_category:
                 system_prompt = prompt_zh.SYSTEM_PROMPT_FOR_PREFERENCE_DATA_ZH.format(
-                    profile=profile, function=functions
+                    profile=prompt_profile, function=prompt_function
                 )
             else:
                 system_prompt = prompt_zh.SYSTEM_PROMPT_FOR_NORMAL_DATA_ZH.format(
-                    time=time, function=functions
+                    time=prompt_time, function=prompt_function
                 )
-            user_prompt = prompt_zh.USER_PROMPT_ZH.format(question=question)
+            user_prompt = prompt_zh.USER_PROMPT_ZH.format(question=prompt_question)
 
         elif self.language == "en":
             if "special" in test_category:
                 system_prompt = prompt_en.SYSTEM_PROMPT_FOR_SPECIAL_DATA_EN.format(
-                    time=time, function=functions
+                    time=prompt_time, function=prompt_function
                 )
 
             elif "preference" in test_category:
                 system_prompt = prompt_en.SYSTEM_PROMPT_FOR_PREFERENCE_DATA_EN.format(
-                    profile=profile, function=functions
+                    profile=prompt_profile, function=prompt_function
                 )
             else:
                 system_prompt = prompt_en.SYSTEM_PROMPT_FOR_NORMAL_DATA_EN.format(
-                    time=time, function=functions
+                    time=prompt_time, function=prompt_function
                 )
-            user_prompt = prompt_en.USER_PROMPT_EN.format(question=question)
+            user_prompt = prompt_en.USER_PROMPT_EN.format(question=prompt_question)
 
         message = [
             {
@@ -122,21 +183,22 @@ class APIModelInference(BaseHandler):
                 response = self.client.chat.completions.create(
                     messages=message,
                     model=self.model_name,
-                    temperature=self.temperature,
-                    max_tokens=self.max_tokens,
-                    top_p=self.top_p,
+                    temperature=0.0,
+                    max_tokens=1024,
+                    top_p=0,
+                    seed=42,
                 )
-                result = response.choices[0].message.content
+                result: Optional[str] = response.choices[0].message.content
 
                 if "deepseek-r1" in self.model_name:
-                    match = re.search(r'</think>\s*(.*)$', result, re.DOTALL)
+                    match = re.search(r"</think>\s*(.*)$", result, re.DOTALL)
                     result = match.group(1).strip()
                 break  # If successful, break the loop
             except Exception as e:
                 print("Exception!!!")
                 attempt += 1
                 # Check if it's a specific error type, skip current iteration
-                if 'data_inspection_failed' in str(e):
+                if "data_inspection_failed" in str(e):
                     print(id)
                     continue  # Skip current iteration, continue to next attempt
                 elif attempt == 6:
@@ -145,12 +207,18 @@ class APIModelInference(BaseHandler):
         return result
 
     def multi_turn_inference(
-        self, question, initial_config, functions, involved_classes, test_id, time
-    ):
+        self,
+        prompt_question: str,
+        initial_config: dict[str, object],
+        prompt_functions: str,
+        involved_classes: list[str],
+        test_id: str,
+        prompt_time: str,
+    ) -> tuple[list[dict[str, dict[str, object]]], list[Optional[str]]]:
         agent = APIAgent_turn(
             model_name=self.model_name,
-            time=time,
-            functions=functions,
+            time=prompt_time,
+            functions=prompt_functions,
             involved_class=involved_classes,
             language=self.language,
         )
@@ -167,17 +235,23 @@ class APIModelInference(BaseHandler):
             language=self.language,
         )
 
-        init_message = user.get_init_prompt(question)
-        
-        scene = Scene(initial_state=initial_config, functions=functions, agent_role=agent, user_role=user, init_message=init_message, language=  self.language)
+        init_message = user.get_init_prompt(prompt_question)
+
+        scene = Scene(
+            initial_state=initial_config,
+            functions=prompt_functions,
+            agent_role=agent,
+            user_role=user,
+            init_message=init_message,
+            language=self.language,
+        )
         message_history = scene.dialogue_history
         result_list = []
-        
+
         result_instance_list = []
         mile_stone = []
         with tqdm(total=self.max_dialog_turns, desc="Processing Messages") as pbar:
             for index in range(self.max_dialog_turns):
-
                 last_recipient = message_history[-1]["recipient"]
                 if last_recipient == "user":
                     inference_message = scene.get_inference_message()
@@ -191,8 +265,10 @@ class APIModelInference(BaseHandler):
                     inference_message = scene.get_inference_message()
                     mile_stone_message = message_history[-1]["message"]
                     mile_stone.append(mile_stone_message)
-                    current_message, result_instance = execution.respond(message_history)
-                    if isinstance(result_instance,dict):
+                    current_message, result_instance = execution.respond(
+                        message_history
+                    )
+                    if isinstance(result_instance, dict):
                         if result_instance not in result_instance_list:
                             result_instance_list.append(result_instance)
 
@@ -202,9 +278,7 @@ class APIModelInference(BaseHandler):
                     break
                 pbar.update(1)
             scene.write_message_history(test_id, self.model_name)
-            
-        
-        
+
         for result_instance in result_instance_list:
             for name, instance in result_instance.items():
                 item_dict = {}
@@ -217,15 +291,21 @@ class APIModelInference(BaseHandler):
         return result_list, mile_stone
 
     def multi_step_inference(
-        self, question, initial_config, functions, involved_classes, test_id, time
+        self,
+        prompt_question,
+        initial_config,
+        prompt_functions,
+        involved_classes,
+        test_id,
+        prompt_time,
     ):
         agent = APIAgent_step(
-            model_name=self.model_name, time=time, functions=functions
+            model_name=self.model_name, time=prompt_time, functions=prompt_functions
         )
         scene = Mulit_Step_Scene(
-            question=question,
+            question=prompt_question,
             initial_state=initial_config,
-            functions=functions,
+            functions=prompt_functions,
             agent_role=agent,
             language=self.language,
         )
@@ -236,21 +316,22 @@ class APIModelInference(BaseHandler):
             test_id=test_id,
             language=self.language,
         )
-        message_history = scene.dialogue_history
+        message_history: list[dict[str, str]] = scene.dialogue_history
         result_list = []
-        
+
         result_instance_list = []
         mile_stone = []
         with tqdm(total=self.max_dialog_turns, desc="Processing Messages") as pbar:
             for index in range(self.max_dialog_turns):
-                
                 last_sender = message_history[-1]["sender"]
                 if index == 0 or last_sender == "execution":
                     inference_message = scene.get_inference_message()
                     current_message = agent.respond(inference_message)
                 else:
                     # Catch exceptions from execution.respond(message_history)
-                    current_message, result_instance = execution.respond(message_history)
+                    current_message, result_instance = execution.respond(
+                        message_history
+                    )
                     mile_stone_message = message_history[-1]["message"]
                     mile_stone.append(mile_stone_message)
                     if result_instance not in result_instance_list:
@@ -262,9 +343,8 @@ class APIModelInference(BaseHandler):
                     break
                 pbar.update(1)
 
-            
         scene.write_message_history(test_id, self.model_name)
-        
+
         for result_instance in result_instance_list:
             for name, instance in result_instance.items():
                 item_dict = {}
@@ -275,6 +355,3 @@ class APIModelInference(BaseHandler):
 
         # Return instance names for subsequent testing of property conformance
         return result_list, mile_stone
-
-
-    

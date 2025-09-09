@@ -1,0 +1,44 @@
+syntax = "proto2";
+
+package environments;
+
+import "trace.proto";
+
+service EnvRpc {
+  rpc Reset(ResetRequest) returns (ResetResponse);
+  rpc Step(StepRequest) returns (StepResponse);
+  rpc Close(CloseRequest) returns (CloseResponse);
+}
+
+message ResetRequest {
+  optional Trace trace = 1;
+  extensions 1002; 
+}
+
+message ResetResponse {
+  optional Trace trace = 1;
+}
+
+message StepRequest {
+  optional Trace trace = 1;
+}
+
+message StepResponse {
+  optional Trace trace = 1;
+}
+
+message CloseRequest {}
+
+message CloseResponse {}
+
+
+message AceBenchResetRequest {
+  optional string model_name = 1;
+  optional float temperature = 2;
+  optional float top_p = 3;
+  optional string category = 4;
+}
+
+extend ResetRequest {
+  optional AceBenchResetRequest ace_bench_reset_request_info = 1002;
+} 

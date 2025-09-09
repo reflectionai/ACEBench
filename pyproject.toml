@@ -1,0 +1,49 @@
+[project]
+name = "environments"
+version = "0.1.0"
+description = "Environments workspace root"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "proto",
+    "core",
+]
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pylint",
+    "pyright",
+    "pylint-protobuf>=0.22.0",  # Added protobuf support for pylint
+    "openai>=1.99.1",
+    "tqdm>=4.67.1",
+    "dotenv",
+    
+
+]
+
+[tool.uv.sources]
+proto = { workspace = true }
+core = { workspace = true }
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.ruff]
+extend-exclude = [
+    "protos/generated/**",
+    "packages/proto/src/proto/generated/**",
+]
+
+# Pylint configuration
+[tool.pylint.MASTER]
+load-plugins = ["pylint_protobuf"]
+
+# Pyright/Pylance additional configuration
+[tool.pyright]
+typeCheckingMode = "strict"
+stubPath = "packages/proto/src"
+extraPaths = [
+    "packages/proto/src", 
+    "packages/core/src"
+]

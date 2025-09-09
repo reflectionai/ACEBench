@@ -62,7 +62,9 @@ class Kimi(object):
             model = self.model_name,
             messages=messages,
             max_tokens=1024,
-            temperature=0.0
+            temperature=0.0,
+            top_p=0,
+            seed=42,
         )
         return response.choices[0].message.content
 

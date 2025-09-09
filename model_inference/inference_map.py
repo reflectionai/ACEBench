@@ -1,5 +1,5 @@
 from model_inference.common_inference import CommonInference
-from model_inference.apimodel_inference import APIModelInference
+from environment.inference.inference import APIModelInference
 
 
 inference_map_groups = {

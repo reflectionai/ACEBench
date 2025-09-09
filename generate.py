@@ -10,6 +10,8 @@ import logging
 
 from absl import flags, app
 from tqdm import tqdm
+from environment import files as files_lib
+
 
 import category as category_lib
 from model_inference.inference_map import inference_map
@@ -57,20 +59,6 @@ flags.register_validator(
 )
 
 
-def load_test_cases(test_files: [Path]) -> list[object]:
-    """Load test cases."""
-    cases: list[Mapping[str, Any]] = []
-    for file_path in test_files:
-        try:
-            with file_path.open(encoding="utf-8") as file:
-                cases.extend(json.loads(line) for line in file)
-        except FileNotFoundError:
-            logger.error(f"Missing test file: {file_path}")
-        except json.JSONDecodeError as err:
-            logger.error(f"Malformed JSON in {file_path}: {err}")
-    return cases
-
-
 def sort_json(file):
     """Sort json."""
     data = []
@@ -101,7 +89,7 @@ def generate_signal(model_name: str, test_case: dict[str, object]):
     )
     result_path = RESULT_PATHS[FLAGS.language]
 
-    test_id = test_case["id"]
+    test_name: str = test_case["id"]
     question = test_case["question"]
     functions = test_case["function"]
     time = test_case.get("time", "")
@@ -109,16 +97,16 @@ def generate_signal(model_name: str, test_case: dict[str, object]):
     if isinstance(functions, (dict, str)):
         functions = [functions]
 
-    if "agent" in test_id:
+    if "agent" in test_name:
         result, process = model_inference.inference(
-            question, functions, time, profile, test_case, test_id
+            question, functions, time, profile, test_case, test_name
         )
-        result_to_write = {"id": test_id, "result": result, "process": process}
+        result_to_write = {"id": test_name, "result": result, "process": process}
     else:
         result = model_inference.inference(
-            question, functions, time, profile, test_case, test_id
+            question, functions, time, profile, test_case, test_name
         )
-        result_to_write = {"id": test_id, "result": result}
+        result_to_write = {"id": test_name, "result": result}
 
     print("Done inference. writing result to: ", result_path)
 
@@ -189,7 +177,7 @@ def main(argv: list[str]):
         completed_ids = collect_completed_test_ids(test_names, model_path)
 
         test_files = [data_path / f"data_{test_name}.json" for test_name in test_names]
-        test_cases_total = load_test_cases(test_files)
+        test_cases_total = files_lib.load_test_cases(test_files)
 
         if len(test_cases_total) > 0:
             generate_results(model_name, test_cases_total, completed_ids)

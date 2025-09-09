@@ -1,6 +1,7 @@
 import json, os
 
 from pathlib import Path
+from typing import Optional, Any
 
 
 class BaseHandler:
@@ -8,12 +9,12 @@ class BaseHandler:
 
     def __init__(
         self,
-        model_name,
-        model_path=None,
-        temperature=0.7,
-        top_p=1,
-        max_tokens=1000,
-        language="zh",
+        model_name: str,
+        model_path: Optional[str] = None,
+        temperature: float = 0.7,
+        top_p: int = 1,
+        max_tokens: int = 1000,
+        language: str = "zh",
     ) -> None:
         self.model_name = model_name
         self.temperature = temperature
@@ -21,7 +22,14 @@ class BaseHandler:
         self.max_tokens = max_tokens
         self.language = language
 
-    def inference(self, prompt, functions, test_category):
+    def inference(
+        self,
+        prompt: str,
+        functions,
+        test_category: str,
+        *args: Any,  # extra positional arguments
+        **kwargs: Any,
+    ):
         # This method is used to retrive model response for each model.
         pass
 
