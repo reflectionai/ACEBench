@@ -34,7 +34,101 @@ SAVED_CLASS = {
     "Travel": ["users", "reservations"],
 }
 
-OPEN_AI_KEY = "OPEN_AI_KEY"
+OPEN_AI_KEY = "OPENAI_API_KEY"
+SINGLE_TURN_MAX_RETRIES = 6
+
+
+def get_single_inference_message(
+    test_category: str,
+    prompt_time: Optional[str],
+    prompt_function: Optional[str],
+    prompt_profile: Optional[str],
+    prompt_question: Optional[str],
+    language="en",
+) -> list[dict[str, str]]:
+    system_prompt: str = ""
+    user_prompt: str = ""
+    if language == "zh":
+        if "special" in test_category:
+            system_prompt = prompt_zh.SYSTEM_PROMPT_FOR_SPECIAL_DATA_ZH.format(
+                time=prompt_time, function=prompt_function
+            )
+        elif "preference" in test_category:
+            system_prompt = prompt_zh.SYSTEM_PROMPT_FOR_PREFERENCE_DATA_ZH.format(
+                profile=prompt_profile, function=prompt_function
+            )
+        else:
+            system_prompt = prompt_zh.SYSTEM_PROMPT_FOR_NORMAL_DATA_ZH.format(
+                time=prompt_time, function=prompt_function
+            )
+        user_prompt = prompt_zh.USER_PROMPT_ZH.format(question=prompt_question)
+    elif language == "en":
+        if "special" in test_category:
+            system_prompt = prompt_en.SYSTEM_PROMPT_FOR_SPECIAL_DATA_EN.format(
+                time=prompt_time, function=prompt_function
+            )
+
+        elif "preference" in test_category:
+            system_prompt = prompt_en.SYSTEM_PROMPT_FOR_PREFERENCE_DATA_EN.format(
+                profile=prompt_profile, function=prompt_function
+            )
+        else:
+            system_prompt = prompt_en.SYSTEM_PROMPT_FOR_NORMAL_DATA_EN.format(
+                time=prompt_time, function=prompt_function
+            )
+        user_prompt = prompt_en.USER_PROMPT_EN.format(question=prompt_question)
+
+    return [
+        {
+            "role": "system",
+            "content": system_prompt,
+        },
+        {
+            "role": "user",
+            "content": user_prompt,
+        },
+    ]
+
+
+def get_response_from_client(
+    open_ai_client: OpenAI,
+    message: list[dict[str, str]],
+    model_name: str,
+    max_retries: int = SINGLE_TURN_MAX_RETRIES,
+) -> Optional[str]:
+    attempt = 0
+    if max_retries < 0:
+        max_retries = 0
+
+    result = None
+    while attempt < max_retries:
+        try:
+            response = open_ai_client.chat.completions.create(
+                messages=message,
+                model=model_name,
+                temperature=0.0,
+                max_tokens=1024,
+                top_p=0,
+                seed=42,
+            )
+            result = response.choices[0].message.content
+
+            if "deepseek-r1" in model_name:
+                match = re.search(r"</think>\s*(.*)$", result, re.DOTALL)
+                result = match.group(1).strip()
+
+            break  # If successful, break the loop
+        except Exception as e:
+            print("Exception!!! ", e)
+            attempt += 1
+            # Check if it's a specific error type, skip current iteration
+            if "data_inspection_failed" in str(e):
+                print(id)
+                continue  # Skip current iteration, continue to next attempt
+            elif attempt == 6:
+                raise e  # If maximum attempts reached, raise exception
+
+    return result
 
 
 class APIModelInference(BaseHandler):
@@ -61,6 +155,7 @@ class APIModelInference(BaseHandler):
 
         if "gpt" in self.model_name:
             api_key = os.getenv(OPEN_AI_KEY)
+            print("API KEY OBTIANED: ", api_key)
             # api_key = secrets.fetch_secret("OPENAI_API_KEY")
             base_url = os.getenv("GPT_BASE_URL")
         elif "deepseek-r1" in self.model_name:
@@ -133,78 +228,14 @@ class APIModelInference(BaseHandler):
         prompt_id: str,
     ):
         """Single Turn Inference."""
-        system_prompt: str = ""
-        user_prompt: str = ""
-        if self.language == "zh":
-            if "special" in test_category:
-                system_prompt = prompt_zh.SYSTEM_PROMPT_FOR_SPECIAL_DATA_ZH.format(
-                    time=prompt_time, function=prompt_function
-                )
-            elif "preference" in test_category:
-                system_prompt = prompt_zh.SYSTEM_PROMPT_FOR_PREFERENCE_DATA_ZH.format(
-                    profile=prompt_profile, function=prompt_function
-                )
-            else:
-                system_prompt = prompt_zh.SYSTEM_PROMPT_FOR_NORMAL_DATA_ZH.format(
-                    time=prompt_time, function=prompt_function
-                )
-            user_prompt = prompt_zh.USER_PROMPT_ZH.format(question=prompt_question)
-
-        elif self.language == "en":
-            if "special" in test_category:
-                system_prompt = prompt_en.SYSTEM_PROMPT_FOR_SPECIAL_DATA_EN.format(
-                    time=prompt_time, function=prompt_function
-                )
-
-            elif "preference" in test_category:
-                system_prompt = prompt_en.SYSTEM_PROMPT_FOR_PREFERENCE_DATA_EN.format(
-                    profile=prompt_profile, function=prompt_function
-                )
-            else:
-                system_prompt = prompt_en.SYSTEM_PROMPT_FOR_NORMAL_DATA_EN.format(
-                    time=prompt_time, function=prompt_function
-                )
-            user_prompt = prompt_en.USER_PROMPT_EN.format(question=prompt_question)
-
-        message = [
-            {
-                "role": "system",
-                "content": system_prompt,
-            },
-            {
-                "role": "user",
-                "content": user_prompt,
-            },
-        ]
-
-        attempt = 0
-        while attempt < 6:
-            try:
-                response = self.client.chat.completions.create(
-                    messages=message,
-                    model=self.model_name,
-                    temperature=0.0,
-                    max_tokens=1024,
-                    top_p=0,
-                    seed=42,
-                )
-                result: Optional[str] = response.choices[0].message.content
-
-                if "deepseek-r1" in self.model_name:
-                    match = re.search(r"</think>\s*(.*)$", result, re.DOTALL)
-                    result = match.group(1).strip()
-                break  # If successful, break the loop
-            except Exception as e:
-                print("Exception!!!")
-                attempt += 1
-                # Check if it's a specific error type, skip current iteration
-                if "data_inspection_failed" in str(e):
-                    print(id)
-                    continue  # Skip current iteration, continue to next attempt
-                elif attempt == 6:
-                    raise e  # If maximum attempts reached, raise exception
-
-        return result
+        message = get_single_inference_message(
+            self.language,
+            prompt_time,
+            prompt_function,
+            prompt_profile,
+            prompt_question,
+        )
+        return get_response_from_client(self.client, message, self.model_name)
 
     def multi_turn_inference(
         self,

@@ -35,8 +35,9 @@ message CloseResponse {}
 message AceBenchResetRequest {
   optional string model_name = 1;
   optional float temperature = 2;
-  optional float top_p = 3;
-  optional string category = 4;
+  optional int32 top_p = 3;
+  optional string test_category = 4;
+  optional int32 test_number = 5;
 }
 
 extend ResetRequest {

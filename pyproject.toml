@@ -18,6 +18,8 @@ dev = [
     "openai>=1.99.1",
     "tqdm>=4.67.1",
     "dotenv",
+    "wcwidth>=0.2.13",
+    "pytest>=8.4.2",
     
 
 ]

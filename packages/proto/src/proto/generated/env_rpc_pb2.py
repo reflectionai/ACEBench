@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from . import trace_pb2 as trace__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\renv_rpc.proto\x12\x0c\x65nvironments\x1a\x0btrace.proto\":\n\x0cResetRequest\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace*\x06\x08\xea\x07\x10\xeb\x07\"3\n\rResetResponse\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace\"1\n\x0bStepRequest\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace\"2\n\x0cStepResponse\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace\"\x0e\n\x0c\x43loseRequest\"\x0f\n\rCloseResponse\"`\n\x14\x41\x63\x65\x42\x65nchResetRequest\x12\x12\n\nmodel_name\x18\x01 \x01(\t\x12\x13\n\x0btemperature\x18\x02 \x01(\x02\x12\r\n\x05top_p\x18\x03 \x01(\x02\x12\x10\n\x08\x63\x61tegory\x18\x04 \x01(\t2\xcb\x01\n\x06\x45nvRpc\x12@\n\x05Reset\x12\x1a.environments.ResetRequest\x1a\x1b.environments.ResetResponse\x12=\n\x04Step\x12\x19.environments.StepRequest\x1a\x1a.environments.StepResponse\x12@\n\x05\x43lose\x12\x1a.environments.CloseRequest\x1a\x1b.environments.CloseResponse:e\n\x1c\x61\x63\x65_bench_reset_request_info\x12\x1a.environments.ResetRequest\x18\xea\x07 \x01(\x0b\x32\".environments.AceBenchResetRequest')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\renv_rpc.proto\x12\x0c\x65nvironments\x1a\x0btrace.proto\":\n\x0cResetRequest\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace*\x06\x08\xea\x07\x10\xeb\x07\"3\n\rResetResponse\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace\"1\n\x0bStepRequest\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace\"2\n\x0cStepResponse\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace\"\x0e\n\x0c\x43loseRequest\"\x0f\n\rCloseResponse\"z\n\x14\x41\x63\x65\x42\x65nchResetRequest\x12\x12\n\nmodel_name\x18\x01 \x01(\t\x12\x13\n\x0btemperature\x18\x02 \x01(\x02\x12\r\n\x05top_p\x18\x03 \x01(\x05\x12\x15\n\rtest_category\x18\x04 \x01(\t\x12\x13\n\x0btest_number\x18\x05 \x01(\x05\x32\xcb\x01\n\x06\x45nvRpc\x12@\n\x05Reset\x12\x1a.environments.ResetRequest\x1a\x1b.environments.ResetResponse\x12=\n\x04Step\x12\x19.environments.StepRequest\x1a\x1a.environments.StepResponse\x12@\n\x05\x43lose\x12\x1a.environments.CloseRequest\x1a\x1b.environments.CloseResponse:e\n\x1c\x61\x63\x65_bench_reset_request_info\x12\x1a.environments.ResetRequest\x18\xea\x07 \x01(\x0b\x32\".environments.AceBenchResetRequest')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -45,7 +45,7 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_CLOSERESPONSE']._serialized_start=276
   _globals['_CLOSERESPONSE']._serialized_end=291
   _globals['_ACEBENCHRESETREQUEST']._serialized_start=293
-  _globals['_ACEBENCHRESETREQUEST']._serialized_end=389
-  _globals['_ENVRPC']._serialized_start=392
-  _globals['_ENVRPC']._serialized_end=595
+  _globals['_ACEBENCHRESETREQUEST']._serialized_end=415
+  _globals['_ENVRPC']._serialized_start=418
+  _globals['_ENVRPC']._serialized_end=621
 # @@protoc_insertion_point(module_scope)

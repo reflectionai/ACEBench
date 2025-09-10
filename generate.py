@@ -177,7 +177,9 @@ def main(argv: list[str]):
         completed_ids = collect_completed_test_ids(test_names, model_path)
 
         test_files = [data_path / f"data_{test_name}.json" for test_name in test_names]
-        test_cases_total = files_lib.load_test_cases(test_files)
+        test_cases_total: list[str] = []
+        for test_file in test_files:
+            test_cases_total.append(files_lib.load_test_cases(test_file))
 
         if len(test_cases_total) > 0:
             generate_results(model_name, test_cases_total, completed_ids)

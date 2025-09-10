@@ -4,6 +4,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Final, Set
 
+DATA_DIRECTORY = Path("data_all/data_en")
+
 
 @lru_cache
 def get_test_case_names() -> Set[str]:
@@ -29,4 +31,3 @@ def get_supported_categories() -> Set[str]:
 
 TEST_CASE_NAMES: Final[Set[str]] = get_test_case_names()
 SUPPORTED_CATEGORIES: Final[Set[str]] = get_supported_categories()
-DATA_DIRECTORY = Path("data_all/data_en")

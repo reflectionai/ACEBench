@@ -1,9 +1,10 @@
 """Libraries for files."""
 
-from typing import Any, TypedDict
+from typing import Optional
 import logging
 from pathlib import Path
 import json
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -12,18 +13,60 @@ logger = logging.getLogger(__name__)
 #     """Structure of a test case in SWEBench."""
 
 
-def load_test_cases(test_file_names: list[Path]) -> dict[str, object]:
+def load_test_case(
+    test_file_path: Path, test_number: Optional[int]
+) -> dict[str, object]:
     """Load test cases."""
-    cases: dict[str, object] = {}
-    for file_path in test_file_names:
-        try:
-            with file_path.open(encoding="utf-8") as file:
-                cases.extend(json.loads(line) for line in file)
-        except FileNotFoundError:
-            logger.error("Missing test file: %s", file_path)
-        except json.JSONDecodeError as err:
-            logger.error("Malformed JSON in %s: %s", file_path, err)
-    return cases
+    case = ""
+    try:
+        all_test_cases_in_file: dict[int, dict[str, object]] = {}
+        count = 0
+        with test_file_path.open(encoding="utf-8") as file:
+            for line in file:
+                line_json = json.loads(line)
+                if "id" not in line_json:
+                    raise ValueError(
+                        f"Malformated file {test_file_path}, as 'id' key is not"
+                        f" present on line:\n'{line}'"
+                    )
+                if not isinstance(line_json, dict):
+                    raise ValueError(
+                        f"Malformated file {test_file_path}, contains a line "
+                        f"that is not a dict:\n'{line}'"
+                    )
+
+                if test_number:
+                    id_val: object = line_json["id"]
+                    if not isinstance(id_val, str):
+                        raise ValueError(
+                            f"Malformated file {test_file_path}, as value of "
+                            f"'id' key is not a string:\n'{line}'"
+                        )
+                    if id_val.endswith(f"_{test_number}"):
+                        return line_json
+
+                all_test_cases_in_file[count] = line_json
+                count += 1
+
+        if test_number:
+            raise ValueError(
+                f"Malformated file {test_file_path}, as there is no id value"
+                f" that ends with _{test_number}"
+            )
+
+        random_number = 0
+        if len(all_test_cases_in_file) > 0:
+            random.randint(0, len(all_test_cases_in_file) - 1)
+        return all_test_cases_in_file[random_number]
+
+    except FileNotFoundError as err:
+        logger.error("Missing test file of %s: %s", test_file_path, err)
+        raise err
+    except json.JSONDecodeError as err:
+        logger.error("Malformed JSON in %s: %s", test_file_path, err)
+        raise err
+
+    return case
 
 
 """AI's suggestion:

@@ -107,21 +107,24 @@ class AceBenchResetRequest(google.protobuf.message.Message):
     MODEL_NAME_FIELD_NUMBER: builtins.int
     TEMPERATURE_FIELD_NUMBER: builtins.int
     TOP_P_FIELD_NUMBER: builtins.int
-    CATEGORY_FIELD_NUMBER: builtins.int
+    TEST_CATEGORY_FIELD_NUMBER: builtins.int
+    TEST_NUMBER_FIELD_NUMBER: builtins.int
     model_name: builtins.str
     temperature: builtins.float
-    top_p: builtins.float
-    category: builtins.str
+    top_p: builtins.int
+    test_category: builtins.str
+    test_number: builtins.int
     def __init__(
         self,
         *,
         model_name: builtins.str | None = ...,
         temperature: builtins.float | None = ...,
-        top_p: builtins.float | None = ...,
-        category: builtins.str | None = ...,
+        top_p: builtins.int | None = ...,
+        test_category: builtins.str | None = ...,
+        test_number: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["category", b"category", "model_name", b"model_name", "temperature", b"temperature", "top_p", b"top_p"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["category", b"category", "model_name", b"model_name", "temperature", b"temperature", "top_p", b"top_p"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["model_name", b"model_name", "temperature", b"temperature", "test_category", b"test_category", "test_number", b"test_number", "top_p", b"top_p"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["model_name", b"model_name", "temperature", b"temperature", "test_category", b"test_category", "test_number", b"test_number", "top_p", b"top_p"]) -> None: ...
 
 global___AceBenchResetRequest = AceBenchResetRequest
 

@@ -3,7 +3,9 @@
 import asyncio
 import logging
 
+from enum import Enum
 
+import logging
 from proto.generated.env_rpc_pb2_grpc import (
     EnvRpcServicer,
     add_EnvRpcServicer_to_server,
@@ -18,13 +20,16 @@ from proto.generated.env_rpc_pb2 import (
     AceBenchResetRequest,
     ace_bench_reset_request_info,
 )
-from proto.generated.trace_pb2 import Trace, Message
+from proto.generated.trace_pb2 import Trace, Message, FinishReasonInfo
+import eval_main as eval_lib
 
 import grpc
 import grpc.aio
 from environment import constants
 from environment import files as files_lib
 from environment.inference import inference as inference_lib
+
+logger = logging.getLogger(__name__)
 
 
 def verify_and_get_acebench_reset_request(
@@ -40,19 +45,33 @@ def verify_and_get_acebench_reset_request(
 
     if not request_info.HasField("model_name"):
         raise ValueError("Missing model_name in ResetRequest.")
-    if not request_info.HasField("category"):
-        raise ValueError("Missing category in ResetRequest.")
+    if not request_info.HasField("test_category"):
+        raise ValueError("Missing test category in ResetRequest.")
 
-    if request_info.category not in constants.SUPPORTED_CATEGORIES:
+    if request_info.test_category not in constants.SUPPORTED_CATEGORIES:
         raise ValueError("Unsupported category in ResetRequest.")
 
     return request_info
 
 
-def get_test_case_file_paths(category: str):
+def get_test_case_file_path(category: str):
     """Given the category, obtain all the test file names."""
-    # Support groupings.
-    return [constants.DATA_DIRECTORY / category / ".json"]
+    return constants.DATA_DIRECTORY / f"{category}.json"
+
+
+class TestCasePromptParams:
+    """Params that formats the test case's prompt"""
+
+    question: str
+    functions: str
+    time: str
+    profile: str
+
+
+class TestCategory(Enum):
+    AGENT_MULTI_TURN = 1
+    AGENT_MULTI_STEP = 2
+    SINGLE_TURN_INFERENCE = 3
 
 
 class EnvRpcService(EnvRpcServicer):
@@ -60,10 +79,13 @@ class EnvRpcService(EnvRpcServicer):
 
     model_name: str
     temperature: float = 0.0
-    top_p: float = 0.0
-    category: str
-    test_cases: dict[str, object]
+    top_p: int = 0
+    testfile_category: str
+    test_number: int
+    test_case: dict[str, object]
     inference: inference_lib.APIModelInference
+    prompt_params: TestCasePromptParams
+    test_category: TestCategory
 
     async def Reset(
         self,
@@ -74,15 +96,33 @@ class EnvRpcService(EnvRpcServicer):
         try:
             request_info = verify_and_get_acebench_reset_request(request)
             self.model_name = request_info.model_name
-            self.category = request_info.category
+            self.testfile_category = request_info.test_category
+            if "agent" in self.testfile_category:
+                if "multi_turn" in self.testfile_category:
+                    self.test_category = TestCategory.AGENT_MULTI_TURN
+                elif "multi_step" in self.testfile_category:
+                    self.test_category = TestCategory.AGENT_MULTI_STEP
+            else:
+                self.test_category = TestCategory.SINGLE_TURN_INFERENCE
+
+            # DO NOT support multiple categories.
+            # mapping from category -> test file should be encoded in
+            # Olympus, not here.
+
+            self.test_case = files_lib.load_test_case(
+                get_test_case_file_path(self.testfile_category),
+                request_info.test_number,
+            )
+
             if request_info.HasField("temperature"):
                 self.temperature = request_info.temperature
             if request_info.HasField("top_p"):
                 self.temperature = request_info.top_p
-
-            # support multiple categories.
-            self.test_cases = files_lib.load_test_cases(
-                get_test_case_file_paths(self.category)
+            self.inference = inference_lib.APIModelInference(
+                self.model_name,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                language="en",
             )
             response = ResetResponse()
             return response
@@ -105,22 +145,55 @@ class EnvRpcService(EnvRpcServicer):
     ) -> StepResponse:
         """Execute a step and return the updated trace."""
         try:
-            trace: Trace
-            # Create trace or use existing one
-            if request.HasField("trace"):
-                trace = request.trace
-            else:
-                trace = Trace()
+            prompt_question = self.test_case["question"]
+            prompt_functions = self.test_case["function"]
+            prompt_time: str = self.test_case.get("time", "")
+            prompt_profile: str = self.test_case.get("profile", "")
+            test_case_id: str = self.test_case["id"]
+            test_category = test_case_id.rsplit("_", 1)[0]
 
-            # Add server response message as expected by tests
-            message: Message = trace.messages.add()
-            message.role = 2  # ASSISTANT
-            message.text = "Message 3"
+            if self.test_category == TestCategory.SINGLE_TURN_INFERENCE:
+                messages = inference_lib.get_single_inference_message(
+                    test_category,
+                    prompt_time,
+                    prompt_functions,
+                    prompt_profile,
+                    prompt_question,
+                )
+                logger.info("sending %s to open ai ", messages)
+                res = inference_lib.get_response_from_client(
+                    self.inference.client, messages, self.model_name
+                )
+            logger.info("result: %s", res)
+            trace = Trace(messages=[Message(text=res)])
+            response = StepResponse(trace=trace)
 
-            response = StepResponse()
-            response.trace.CopyFrom(trace)
+            # else:
+            #     initial_config = self.test_case["initial_config"]
+            # involved_classes = self.test_case["involved_classes"]
+
+            # if self.test_category == TestCategory.AGENT_MULTI_TURN:
+            #     result, process_list = self.inference.multi_turn_inference(
+            #             prompt_question,
+            #             initial_config,
+            #             prompt_functions,
+            #             involved_classes,
+            #             test_case_id,
+            #             prompt_time,
+            #         )
+
+            # elif self.test_category == TestCategory.AGENT_MULTI_STEP:
+            #     result, process_list = self.inference.multi_step_inference(
+            #         prompt_question,
+            #         initial_config,
+            #         prompt_functions,
+            #         involved_classes,
+            #         test_case_id,
+            #         prompt_time,
+            #     )
+
+            # Eval
             return response
-
         except grpc.RpcError:
             raise
         except (ValueError, AttributeError) as e:
