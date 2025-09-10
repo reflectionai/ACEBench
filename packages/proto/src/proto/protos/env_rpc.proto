@@ -1,0 +1,112 @@
+syntax = "proto2";
+
+package environments;
+
+import "trace.proto";
+
+service EnvRpc {
+  rpc Reset(ResetRequest) returns (ResetResponse);
+  rpc Step(StepRequest) returns (StepResponse);
+  rpc Close(CloseRequest) returns (CloseResponse);
+}
+
+message ResetRequest {
+  optional Trace trace = 1;
+  extensions 1002; 
+}
+
+message ResetResponse {
+  optional Trace trace = 1;
+}
+
+message StepRequest {
+  optional Trace trace = 1;
+}
+
+message StepResponse {
+  optional Trace trace = 1;
+}
+
+message CloseRequest {}
+
+message CloseResponse {}
+
+
+// message AceBenchResetRequest {
+//   optional string model_name = 1;
+//   optional float temperature = 2;
+//   optional int32 top_p = 3;
+//   optional string test_category = 4;
+//   optional int32 test_number = 5;
+// }
+
+// extend ResetRequest {
+//   optional AceBenchResetRequest ace_bench_reset_request_info = 1002;
+// } 
+
+
+message AceBenchMessageInfo {
+  // The name of the test.
+  optional string name = 1;
+  // The output of the test.
+  optional string output = 2;
+  optional string error_type = 3;
+  optional float accuracy = 4;
+}
+
+
+// A test result is the result of running a single test.
+message TestResult {
+  // TODO: maybe this needs to be gathered ??
+  // The name of the test.
+  optional string name = 1;
+  // The output of the test.
+  optional string output = 2;
+  optional string error_type = 3;
+  optional float accuracy = 4;
+}
+
+
+message AceBenchTask {
+  optional string model_name = 1;
+  optional float temperature = 2;
+  optional int32 top_p = 3;
+  optional string test_category = 4;
+  optional int32 test_number = 5;
+
+  // // The instance id of the task.
+  // optional string instance_id = 1;
+  // // The gold patch of the problem.
+  // optional CodePatch gold_patch = 2;
+  // // Optionally the associated pull request.
+  // optional PullRequest pull_request = 3;
+  // // Any issue comments associated with the pull request.
+  // repeated IssueComment comments = 4;
+  // // The repo of the task.
+  // optional Repo repo = 5;
+  // // The problem statement of the task.
+  // optional ProblemStatement problem_statement = 6;
+  // // The version of the codebase for the task
+  // optional string version = 7;
+  // // Fields necessary for evaluation
+  // optional SweBenchEvaluation evaluation_info = 8;
+  // // The image associated for this task
+  // optional string image = 9;
+}
+
+// A sweep benchmark is a collection of traces.
+message AceBenchTraceInfo {
+  // The description of the test case.
+  optional AceBenchTask task = 1;
+  // Optionally the test results.
+  repeated TestResult test_results = 6;
+}
+
+// A sweep benchmark specific Trace.
+extend Trace {
+  optional AceBenchTraceInfo ace_bench_trace_info = 1001;
+}
+
+extend Message {
+  optional AceBenchMessageInfo ace_bench_msg_info = 1010;
+}

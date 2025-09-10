@@ -1,0 +1,237 @@
+// Protobuf definition for the trace.
+syntax = "proto2";
+
+package environments;
+
+import "google/protobuf/struct.proto";
+
+///////////// Sampling ////////////
+//
+//
+message Token {
+  enum Tag {
+    // A header describing the role of the message.
+    MESSAGE_HEADER = 0;
+    // The content of a non-inference message.
+    MESSAGE_CONTENT = 1;
+    // The end of a non-inference message.
+    MESSAGE_EOT = 2;
+    // Header sections showing where the trace begins (and sometimes ends).
+    TRACE_HEADER = 3;
+    // The messages in the trace.
+    TRACE_MESSAGES = 4;
+  }
+  // The token ID.
+  optional int64 token_id = 1;
+  // A string representation of the token.
+  optional string token_str = 2;
+  // The tags associated with the token.
+  repeated int32 tags = 3;
+}
+
+message Logprob {
+  // The token.
+  optional Token token = 1;
+
+  // The logprob for the token.
+  optional double logprob = 2;
+}
+
+message SampledToken {
+  // The token.
+  optional Token selected_token = 1;
+
+  // The logprobs for the token.
+  repeated Logprob logprobs = 2;
+}
+
+// Information about a sampling event.
+message SamplingInfo {
+  // The tokenized input.
+  repeated Token input_tokens = 1;
+
+  // The sampled output tokens each with their top-k logprobs.
+  repeated SampledToken output_tokens = 2;
+}
+
+// Arguments for sampling a value.
+
+message ValueSamplingArguments {
+  // The minimum value to sample from.
+  optional double min_value = 1;
+
+  // The maximum value to sample from.
+  optional double max_value = 2;
+}
+
+message SamplingArguments {
+  // The temperature to sample with.
+  optional double temperature = 1;
+
+  // The top-p to sample with.
+  optional double top_p = 2;
+
+  // Maximum number of tokens to sample.
+  optional int32 max_tokens = 3;
+
+  // Optional arguments for value sampling.
+  optional ValueSamplingArguments value_sampling_args = 4;
+
+  // Whether to skip special tokens.
+  optional bool skip_special_tokens = 5;
+
+  // The number of prompt logprobs to return.
+  optional int32 num_prompt_logprobs = 6;
+
+  // The number of logprobs to return for each sampled token.
+  optional int32 num_logprobs = 7;
+
+  // If -1, the input will be truncated to the model's context
+  // length. If set to 0, no truncation will happen and an error will be returned
+  // if the input exceeds the model's context length. If set to an integer k,
+  // will use only the last k tokens from the prompt (i.e., left truncation).
+  optional int32 truncate_input = 8; // default: 0
+
+  // Reserve space for extended SamplingArguments
+  extensions 1000 to max;
+}
+//////////////////////////////////
+
+// The role of a message.
+enum Role {
+  UNSPECIFIED = 0;
+  USER = 1;
+  ASSISTANT = 2;
+  SYSTEM = 3;
+  VALUE = 4;
+}
+
+// A value message.
+// Value messages contain a special value token which corresponds to one of three
+// discrete enum values: `ZERO`, `ONE`, and `UNKNOWN`. The first two
+// allow using the transformer to predict continuous quantities (e.g., via the
+// two-hot distribution RL trick). The `UNKNOWN` value is used to mask out value
+// tokens in the input (values are forward-looking, so autoregressive masking
+// could otherwise cheat by looking backward).
+message Value {
+  enum ValueType {
+    ZERO = 0;
+    ONE = 1;
+    UNKNOWN = 2;
+  }
+  optional int32 value = 1;
+}
+
+// A message is the basic unit of a trace.
+message Message {
+  // The role of the message.
+  optional int32 role = 1;
+
+  // The content of the message.
+  oneof content {
+    string text = 2;
+    Value value = 3;
+  }
+  // The sampling information for the message.
+  optional SamplingInfo sampling_info = 4;
+
+  // The metadata for the message.
+  optional google.protobuf.Struct metadata = 5;
+
+  // The reward for the message.
+  optional float reward = 6 [default = 0.0];
+
+  // Reserve space for extended MessageInfo. If you add an extension, break it
+  // apart from the extension range and add a comment to ensure it isn't reused.
+
+  extensions 1000, 1004 to 1006, 1010 to max;
+  extensions 1001;  // CodemonkeysLocalizationMessageInfo
+  extensions 1002;  // FinishInfo
+  extensions 1003;  // CodemonkeysEditMessageInfo
+  extensions 1007;  // AuxiliaryReward
+  extensions 1008;  // SelectionGraderInfo
+  extensions 1009;  // SelectionJudgeInput
+}
+
+// Extension for Message providing finish_reason and stop_reason (aligned with vllm/dromeus)
+message FinishReasonInfo {
+  // The reason why the sequence is finished.
+  optional string finish_reason = 1;
+
+  message StopReason {
+    oneof reason {
+      int32 reason_int = 1;
+      string reason_str = 2;
+    }
+  }
+
+  // The stop string or token id that caused the completion
+  // to stop, None if the completion finished for some other reason
+  // including encountering the EOS token.
+  optional StopReason stop_reason = 2;
+}
+
+message AuxiliaryReward {
+  // the auxiliary reward value
+  optional float value = 1;
+}
+
+// Register the extensions with the Message type
+extend Message {
+  optional FinishReasonInfo finish_reason_info = 1002;
+  optional AuxiliaryReward auxiliary_reward = 1007;
+}
+
+// A trace is a collection of messages.
+message Trace {
+  // The messages in the trace.
+  repeated Message messages = 1;
+
+  // The metadata for the trace.
+  optional google.protobuf.Struct metadata = 2;
+
+  // Whether the trace is terminated.
+  optional bool terminated = 3;
+
+  // The sampling arguments used for inference
+  optional SamplingArguments sampling_arguments = 4;
+
+  // Reserve space for extended TraceInfo. If you add an extension, break it
+  // apart from the extension range and add a comment to ensure it isn't reused.
+
+  extensions 1000, 1015 to max;
+  extensions 1001;  // SweBenchTraceInfo
+  extensions 1002;  // CodemonkeysLocalizationTraceInfo
+  extensions 1003;  // DeepCoderTraceInfo
+  // TODO(nschank): This is bad, both may need to be killed and replaced
+  extensions 1004;  // CodemonkeysEditStageTraceInfo and CLIAgentTraceInfo
+  // TODO(nschank): This is bad, both may need to be killed and replaced
+  extensions 1005;  // LocationAgentContexts and TestGenEvalTraceInfo
+  extensions 1006;  // Metrics
+  extensions 1007;  // LocalizationAgentContexts
+  extensions 1008;  // CodemonkeysTestStageTraceInfo
+  extensions 1009; // DocQATraceInfo
+  extensions 1010; // NL2SHTraceInfo
+  extensions 1011; // Synthetic2TraceInfo
+  extensions 1012; // CodemonkeysEditTaskInput
+  extensions 1013; // ComponentParameters
+  extensions 1014; // AceBenchTaskInput
+}
+
+message Metric {
+  // the name of the metric
+  optional string name = 1;
+
+  // its value
+  oneof value {
+    float float_value = 2;
+    bool bool_value = 3;
+    int32 int_value = 4;
+    string string_value = 5;
+  }
+}
+
+extend Trace {
+  // metrics about the individual messages in the trace
+  repeated Metric metrics = 1006;
+}

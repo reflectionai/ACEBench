@@ -218,9 +218,10 @@ class APIAgent_turn():
             response = self.client.chat.completions.create(
                 messages=message,
                 model=self.model_name,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                top_p=self.top_p,
+                temperature=0.0,
+                max_tokens=1024,
+                top_p=0,
+                seed=42,
             )
             response = response.choices[0].message.content
         else:
@@ -231,6 +232,10 @@ class APIAgent_turn():
             response = self.client.chat.completions.create(
                 messages=message,
                 model=self.model_name,
+                temperature=0.0,
+                max_tokens=1024,
+                top_p=0,
+                seed=42,
             )
             response = response.choices[0].message.content
 

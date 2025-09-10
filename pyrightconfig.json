@@ -1,0 +1,18 @@
+{
+    "typeCheckingMode": "strict",
+    "reportUnnecessaryTypeIgnoreComment": "error",
+    "reportMissingTypeStubs": "warning",
+    "reportUnknownMemberType": "warning",
+    "reportUnknownVariableType": "warning",
+    "reportUnknownArgumentType": "warning",
+    "reportUnknownParameterType": "warning",
+    "reportMissingParameterType": "warning",
+    "reportIncompatibleMethodOverride": "error",
+    "venvPath": ".",
+    "venv": ".venv",
+    "stubPath": "packages/proto/src",
+    "extraPaths": [
+        "packages/proto/src",
+        "packages/core/src"
+    ]
+}
