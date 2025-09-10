@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from . import trace_pb2 as trace__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\renv_rpc.proto\x12\x0c\x65nvironments\x1a\x0btrace.proto\":\n\x0cResetRequest\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace*\x06\x08\xea\x07\x10\xeb\x07\"3\n\rResetResponse\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace\"1\n\x0bStepRequest\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace\"2\n\x0cStepResponse\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace\"\x0e\n\x0c\x43loseRequest\"\x0f\n\rCloseResponse\"z\n\x14\x41\x63\x65\x42\x65nchResetRequest\x12\x12\n\nmodel_name\x18\x01 \x01(\t\x12\x13\n\x0btemperature\x18\x02 \x01(\x02\x12\r\n\x05top_p\x18\x03 \x01(\x05\x12\x15\n\rtest_category\x18\x04 \x01(\t\x12\x13\n\x0btest_number\x18\x05 \x01(\x05\x32\xcb\x01\n\x06\x45nvRpc\x12@\n\x05Reset\x12\x1a.environments.ResetRequest\x1a\x1b.environments.ResetResponse\x12=\n\x04Step\x12\x19.environments.StepRequest\x1a\x1a.environments.StepResponse\x12@\n\x05\x43lose\x12\x1a.environments.CloseRequest\x1a\x1b.environments.CloseResponse:e\n\x1c\x61\x63\x65_bench_reset_request_info\x12\x1a.environments.ResetRequest\x18\xea\x07 \x01(\x0b\x32\".environments.AceBenchResetRequest')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\renv_rpc.proto\x12\x0c\x65nvironments\x1a\x0btrace.proto\":\n\x0cResetRequest\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace*\x06\x08\xea\x07\x10\xeb\x07\"3\n\rResetResponse\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace\"1\n\x0bStepRequest\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace\"2\n\x0cStepResponse\x12\"\n\x05trace\x18\x01 \x01(\x0b\x32\x13.environments.Trace\"\x0e\n\x0c\x43loseRequest\"\x0f\n\rCloseResponse\"Y\n\x13\x41\x63\x65\x42\x65nchMessageInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06output\x18\x02 \x01(\t\x12\x12\n\nerror_type\x18\x03 \x01(\t\x12\x10\n\x08\x61\x63\x63uracy\x18\x04 \x01(\x02\"P\n\nTestResult\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06output\x18\x02 \x01(\t\x12\x12\n\nerror_type\x18\x03 \x01(\t\x12\x10\n\x08\x61\x63\x63uracy\x18\x04 \x01(\x02\"r\n\x0c\x41\x63\x65\x42\x65nchTask\x12\x12\n\nmodel_name\x18\x01 \x01(\t\x12\x13\n\x0btemperature\x18\x02 \x01(\x02\x12\r\n\x05top_p\x18\x03 \x01(\x05\x12\x15\n\rtest_category\x18\x04 \x01(\t\x12\x13\n\x0btest_number\x18\x05 \x01(\x05\"m\n\x11\x41\x63\x65\x42\x65nchTraceInfo\x12(\n\x04task\x18\x01 \x01(\x0b\x32\x1a.environments.AceBenchTask\x12.\n\x0ctest_results\x18\x06 \x03(\x0b\x32\x18.environments.TestResult2\xcb\x01\n\x06\x45nvRpc\x12@\n\x05Reset\x12\x1a.environments.ResetRequest\x1a\x1b.environments.ResetResponse\x12=\n\x04Step\x12\x19.environments.StepRequest\x1a\x1a.environments.StepResponse\x12@\n\x05\x43lose\x12\x1a.environments.CloseRequest\x1a\x1b.environments.CloseResponse:S\n\x14\x61\x63\x65_bench_trace_info\x12\x13.environments.Trace\x18\xe9\x07 \x01(\x0b\x32\x1f.environments.AceBenchTraceInfo:U\n\x12\x61\x63\x65_bench_msg_info\x12\x15.environments.Message\x18\xf2\x07 \x01(\x0b\x32!.environments.AceBenchMessageInfo')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -44,8 +44,14 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_CLOSEREQUEST']._serialized_end=274
   _globals['_CLOSERESPONSE']._serialized_start=276
   _globals['_CLOSERESPONSE']._serialized_end=291
-  _globals['_ACEBENCHRESETREQUEST']._serialized_start=293
-  _globals['_ACEBENCHRESETREQUEST']._serialized_end=415
-  _globals['_ENVRPC']._serialized_start=418
-  _globals['_ENVRPC']._serialized_end=621
+  _globals['_ACEBENCHMESSAGEINFO']._serialized_start=293
+  _globals['_ACEBENCHMESSAGEINFO']._serialized_end=382
+  _globals['_TESTRESULT']._serialized_start=384
+  _globals['_TESTRESULT']._serialized_end=464
+  _globals['_ACEBENCHTASK']._serialized_start=466
+  _globals['_ACEBENCHTASK']._serialized_end=580
+  _globals['_ACEBENCHTRACEINFO']._serialized_start=582
+  _globals['_ACEBENCHTRACEINFO']._serialized_end=691
+  _globals['_ENVRPC']._serialized_start=694
+  _globals['_ENVRPC']._serialized_end=897
 # @@protoc_insertion_point(module_scope)

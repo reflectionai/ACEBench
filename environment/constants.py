@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Final, Set
 
 DATA_DIRECTORY = Path("data_all/data_en")
+POSSIBLE_ANSWER_DIRECTORY = Path("data_all/data_en/possible_answer/")
 
 
 @lru_cache
@@ -17,7 +18,13 @@ def get_test_case_names() -> Set[str]:
     if not directory.is_dir():
         raise FileNotFoundError(f"'{DATA_DIRECTORY}/' is not a directory.")
 
-    categories = {f.stem for f in directory.glob("*.json") if f.is_file()}
+    categories = set()
+    for f in directory.glob("*.json"):
+        if not f.is_file():
+            continue
+        if f.stem.startswith("data_"):
+            categories.add(f.stem[5:])
+    # categories = {f.stem for f in directory.glob("*.json") if f.is_file()}
     return categories
 
 

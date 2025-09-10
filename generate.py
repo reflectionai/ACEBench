@@ -101,16 +101,14 @@ def generate_signal(model_name: str, test_case: dict[str, object]):
         result, process = model_inference.inference(
             question, functions, time, profile, test_case, test_name
         )
-        result_to_write = {"id": test_name, "result": result, "process": process}
     else:
         result = model_inference.inference(
             question, functions, time, profile, test_case, test_name
         )
-        result_to_write = {"id": test_name, "result": result}
 
     print("Done inference. writing result to: ", result_path)
 
-    model_inference.write_result(result_to_write, model_name, result_path)
+    model_inference.write_result(result, model_name, result_path)
 
 
 def generate_results(

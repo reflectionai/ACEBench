@@ -4,7 +4,9 @@ isort:skip_file
 """
 
 import builtins
+import collections.abc
 import google.protobuf.descriptor
+import google.protobuf.internal.containers
 import google.protobuf.internal.extension_dict
 import google.protobuf.message
 import trace_pb2
@@ -101,7 +103,70 @@ class CloseResponse(google.protobuf.message.Message):
 global___CloseResponse = CloseResponse
 
 @typing.final
-class AceBenchResetRequest(google.protobuf.message.Message):
+class AceBenchMessageInfo(google.protobuf.message.Message):
+    """extend ResetRequest {
+      optional AceBenchResetRequest ace_bench_reset_request_info = 1002;
+    }
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: builtins.int
+    OUTPUT_FIELD_NUMBER: builtins.int
+    ERROR_TYPE_FIELD_NUMBER: builtins.int
+    ACCURACY_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    """The name of the test."""
+    output: builtins.str
+    """The output of the test."""
+    error_type: builtins.str
+    accuracy: builtins.float
+    def __init__(
+        self,
+        *,
+        name: builtins.str | None = ...,
+        output: builtins.str | None = ...,
+        error_type: builtins.str | None = ...,
+        accuracy: builtins.float | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["accuracy", b"accuracy", "error_type", b"error_type", "name", b"name", "output", b"output"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["accuracy", b"accuracy", "error_type", b"error_type", "name", b"name", "output", b"output"]) -> None: ...
+
+global___AceBenchMessageInfo = AceBenchMessageInfo
+
+@typing.final
+class TestResult(google.protobuf.message.Message):
+    """A test result is the result of running a single test."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: builtins.int
+    OUTPUT_FIELD_NUMBER: builtins.int
+    ERROR_TYPE_FIELD_NUMBER: builtins.int
+    ACCURACY_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    """TODO: maybe this needs to be gathered ??
+    The name of the test.
+    """
+    output: builtins.str
+    """The output of the test."""
+    error_type: builtins.str
+    accuracy: builtins.float
+    def __init__(
+        self,
+        *,
+        name: builtins.str | None = ...,
+        output: builtins.str | None = ...,
+        error_type: builtins.str | None = ...,
+        accuracy: builtins.float | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["accuracy", b"accuracy", "error_type", b"error_type", "name", b"name", "output", b"output"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["accuracy", b"accuracy", "error_type", b"error_type", "name", b"name", "output", b"output"]) -> None: ...
+
+global___TestResult = TestResult
+
+@typing.final
+class AceBenchTask(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     MODEL_NAME_FIELD_NUMBER: builtins.int
@@ -126,7 +191,36 @@ class AceBenchResetRequest(google.protobuf.message.Message):
     def HasField(self, field_name: typing.Literal["model_name", b"model_name", "temperature", b"temperature", "test_category", b"test_category", "test_number", b"test_number", "top_p", b"top_p"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["model_name", b"model_name", "temperature", b"temperature", "test_category", b"test_category", "test_number", b"test_number", "top_p", b"top_p"]) -> None: ...
 
-global___AceBenchResetRequest = AceBenchResetRequest
+global___AceBenchTask = AceBenchTask
 
-ACE_BENCH_RESET_REQUEST_INFO_FIELD_NUMBER: builtins.int
-ace_bench_reset_request_info: google.protobuf.internal.extension_dict._ExtensionFieldDescriptor[global___ResetRequest, global___AceBenchResetRequest]
+@typing.final
+class AceBenchTraceInfo(google.protobuf.message.Message):
+    """A sweep benchmark is a collection of traces."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_FIELD_NUMBER: builtins.int
+    TEST_RESULTS_FIELD_NUMBER: builtins.int
+    @property
+    def task(self) -> global___AceBenchTask:
+        """The description of the test case."""
+
+    @property
+    def test_results(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___TestResult]:
+        """Optionally the test results."""
+
+    def __init__(
+        self,
+        *,
+        task: global___AceBenchTask | None = ...,
+        test_results: collections.abc.Iterable[global___TestResult] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["task", b"task"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["task", b"task", "test_results", b"test_results"]) -> None: ...
+
+global___AceBenchTraceInfo = AceBenchTraceInfo
+
+ACE_BENCH_TRACE_INFO_FIELD_NUMBER: builtins.int
+ACE_BENCH_MSG_INFO_FIELD_NUMBER: builtins.int
+ace_bench_trace_info: google.protobuf.internal.extension_dict._ExtensionFieldDescriptor[trace_pb2.Trace, global___AceBenchTraceInfo]
+ace_bench_msg_info: google.protobuf.internal.extension_dict._ExtensionFieldDescriptor[trace_pb2.Message, global___AceBenchMessageInfo]

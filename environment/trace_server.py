@@ -4,6 +4,9 @@ import asyncio
 import logging
 
 from enum import Enum
+from pathlib import Path
+from model_eval import evaluation_helper as eval_helper
+from model_eval import utils as eval_utils
 
 import logging
 from proto.generated.env_rpc_pb2_grpc import (
@@ -17,11 +20,14 @@ from proto.generated.env_rpc_pb2 import (
     StepResponse,
     CloseRequest,
     CloseResponse,
-    AceBenchResetRequest,
-    ace_bench_reset_request_info,
+    AceBenchTask,
+    ace_bench_trace_info,
+    TestResult,
+    AceBenchMessageInfo,
+    ace_bench_msg_info,
 )
-from proto.generated.trace_pb2 import Trace, Message, FinishReasonInfo
-import eval_main as eval_lib
+from proto.generated.trace_pb2 import Trace, Message, Role
+from environment.evaluation import eval as eval_lib
 
 import grpc
 import grpc.aio
@@ -30,33 +36,100 @@ from environment import files as files_lib
 from environment.inference import inference as inference_lib
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 
-def verify_and_get_acebench_reset_request(
+def validate_and_get_acebench_reset_request(
     request: ResetRequest,
-) -> AceBenchResetRequest:
+) -> AceBenchTask:
     """Validate the incoming ResetRequest and return if valid."""
-    if not request.HasExtension(ace_bench_reset_request_info):
-        raise ValueError(
-            "Missing ace_bench_reset_request_info extension in ResetRequest."
-        )
-    request_info = AceBenchResetRequest()
-    request_info.CopyFrom(request.Extensions[ace_bench_reset_request_info])
+    if not request.trace:
+        raise ValueError("Missing trace or trace from last message.")
+    if not request.trace.HasExtension(ace_bench_trace_info):
+        raise ValueError("Missing ace_bench_trace_info extension in ResetRequest.")
+    task_info = AceBenchTask()
+    task_info.CopyFrom(request.trace.Extensions[ace_bench_trace_info].task)
 
-    if not request_info.HasField("model_name"):
+    if not task_info.HasField("model_name"):
         raise ValueError("Missing model_name in ResetRequest.")
-    if not request_info.HasField("test_category"):
+    if not task_info.HasField("test_category"):
         raise ValueError("Missing test category in ResetRequest.")
 
-    if request_info.test_category not in constants.SUPPORTED_CATEGORIES:
+    if task_info.test_category not in constants.SUPPORTED_CATEGORIES:
         raise ValueError("Unsupported category in ResetRequest.")
 
-    return request_info
+    return task_info
+
+
+def validate_step_request_and_get_trace(request: StepRequest) -> Trace:
+    if request.trace is None:
+        raise ValueError(f"The Trace is not available in the request: {request}")
+    if request.trace.messages is None or len(request.trace.messages) == 0:
+        raise ValueError(f"No messages available from trace in the request: {request}")
+    last_message = request.trace.messages[-1]
+    if last_message.role != Role.ASSISTANT:
+        raise ValueError("The last message is not an assistant message.")
+    return request.trace
 
 
 def get_test_case_file_path(category: str):
     """Given the category, obtain all the test file names."""
-    return constants.DATA_DIRECTORY / f"{category}.json"
+    return constants.DATA_DIRECTORY / f"data_{category}.json"
+
+
+def get_matching_answer(testfile_category: str, test_case_id: str):
+    prompt_path = eval_utils.build_data_path(
+        constants.POSSIBLE_ANSWER_DIRECTORY, testfile_category
+    )
+    all_answers = eval_helper.load_file(prompt_path)
+
+    return next((a for a in all_answers if a["id"] == test_case_id), None)
+
+
+def trace_message_text_to_model_result(test_case_id: str, text: str):
+    # TODO: probably code up the expected schema for each category.
+    return {"id": test_case_id, "result": text}
+
+
+def evaluate(
+    trace: Trace,
+    model_output_text: str,
+    model_name: str,
+    testfile_category: str,
+    test_case_data,
+) -> Message:
+    test_case_id = test_case_data["id"]
+    matching_answer = get_matching_answer(testfile_category, test_case_id)
+    eval_result = eval_lib.run_eval(
+        model_name,
+        testfile_category,
+        [{"id": test_case_id, "result": model_output_text}],
+        eval_lib.get_paths("en"),
+        "en",
+        prompt=[test_case_data],
+        possible_answers=[matching_answer],
+    )
+    # TODO: update this manual check
+    assert len(eval_result) == 1
+    eval_result = eval_result[0]
+
+    # AceBenchMessageInfo,
+    # ace_bench_msg_info,
+    # TODO update based on the category.
+    ace_result = AceBenchMessageInfo()
+    ace_result.name = test_case_id
+    if "error_type" in eval_result:
+        ace_result.error_type = eval_result["error_type"]
+    if "accuracy" in eval_result:
+        ace_result.accuracy = eval_result["accuracy"]
+
+    message = Message(role=Role.SYSTEM, text="")
+    message.Extensions[ace_bench_msg_info].CopyFrom(ace_result)
+    return message
 
 
 class TestCasePromptParams:
@@ -82,7 +155,7 @@ class EnvRpcService(EnvRpcServicer):
     top_p: int = 0
     testfile_category: str
     test_number: int
-    test_case: dict[str, object]
+    test_case_data: dict[str, object]
     inference: inference_lib.APIModelInference
     prompt_params: TestCasePromptParams
     test_category: TestCategory
@@ -94,9 +167,9 @@ class EnvRpcService(EnvRpcServicer):
     ) -> ResetResponse:
         """Reset()."""
         try:
-            request_info = verify_and_get_acebench_reset_request(request)
-            self.model_name = request_info.model_name
-            self.testfile_category = request_info.test_category
+            task_info = validate_and_get_acebench_reset_request(request)
+            self.model_name = task_info.model_name
+            self.testfile_category = task_info.test_category
             if "agent" in self.testfile_category:
                 if "multi_turn" in self.testfile_category:
                     self.test_category = TestCategory.AGENT_MULTI_TURN
@@ -109,33 +182,60 @@ class EnvRpcService(EnvRpcServicer):
             # mapping from category -> test file should be encoded in
             # Olympus, not here.
 
-            self.test_case = files_lib.load_test_case(
+            self.test_number = task_info.test_number
+            self.test_case_data = files_lib.load_test_case(
                 get_test_case_file_path(self.testfile_category),
-                request_info.test_number,
+                self.test_number,
             )
 
-            if request_info.HasField("temperature"):
-                self.temperature = request_info.temperature
-            if request_info.HasField("top_p"):
-                self.temperature = request_info.top_p
+            if task_info.HasField("temperature"):
+                self.temperature = task_info.temperature
+            if task_info.HasField("top_p"):
+                self.temperature = task_info.top_p
             self.inference = inference_lib.APIModelInference(
                 self.model_name,
                 temperature=self.temperature,
                 top_p=self.top_p,
                 language="en",
             )
+
+            prompt_question = self.test_case_data["question"]
+            prompt_functions = self.test_case_data["function"]
+            prompt_time: str = self.test_case_data.get("time", "")
+            prompt_profile: str = self.test_case_data.get("profile", "")
+            test_case_id: str = self.test_case_data["id"]
+            test_category = test_case_id.rsplit("_", 1)[0]
+            if self.test_category == TestCategory.SINGLE_TURN_INFERENCE:
+                messages = inference_lib.get_single_inference_message(
+                    test_category,
+                    prompt_time,
+                    prompt_functions,
+                    prompt_profile,
+                    prompt_question,
+                )
+                proto_messages = []
+                for m in messages:
+                    if m["role"] == "system":
+                        proto_messages.append(
+                            Message(role=Role.SYSTEM, text=m["content"])
+                        )
+                    elif m["role"] == "user":
+                        proto_messages.append(
+                            Message(role=Role.USER, text=m["content"])
+                        )
+
             response = ResetResponse()
             return response
 
         except grpc.RpcError:
             raise
         except (ValueError, AttributeError) as e:
-            logging.error("Error in Reset: %s", e)
+            logger.error("Error in Reset: %s", e)
             await context.abort(
                 grpc.StatusCode.INVALID_ARGUMENT, f"Invalid request: {e}"
             )
         except Exception as e:
-            logging.error("Unexpected error in Reset: %s", e)
+            logger.error("Unexpected error in Reset: %s", e)
             await context.abort(grpc.StatusCode.INTERNAL, f"Internal error: {e}")
 
     async def Step(
@@ -145,64 +245,30 @@ class EnvRpcService(EnvRpcServicer):
     ) -> StepResponse:
         """Execute a step and return the updated trace."""
         try:
-            prompt_question = self.test_case["question"]
-            prompt_functions = self.test_case["function"]
-            prompt_time: str = self.test_case.get("time", "")
-            prompt_profile: str = self.test_case.get("profile", "")
-            test_case_id: str = self.test_case["id"]
-            test_category = test_case_id.rsplit("_", 1)[0]
+            trace = validate_step_request_and_get_trace(request)
 
             if self.test_category == TestCategory.SINGLE_TURN_INFERENCE:
-                messages = inference_lib.get_single_inference_message(
-                    test_category,
-                    prompt_time,
-                    prompt_functions,
-                    prompt_profile,
-                    prompt_question,
+                message = evaluate(
+                    trace,
+                    trace.messages[-1].text,
+                    self.model_name,
+                    self.testfile_category,
+                    self.test_case_data,
                 )
-                logger.info("sending %s to open ai ", messages)
-                res = inference_lib.get_response_from_client(
-                    self.inference.client, messages, self.model_name
-                )
-            logger.info("result: %s", res)
-            trace = Trace(messages=[Message(text=res)])
-            response = StepResponse(trace=trace)
+                trace.messages.append(message)
 
-            # else:
-            #     initial_config = self.test_case["initial_config"]
-            # involved_classes = self.test_case["involved_classes"]
+                # TODO: Support more than single turn.
 
-            # if self.test_category == TestCategory.AGENT_MULTI_TURN:
-            #     result, process_list = self.inference.multi_turn_inference(
-            #             prompt_question,
-            #             initial_config,
-            #             prompt_functions,
-            #             involved_classes,
-            #             test_case_id,
-            #             prompt_time,
-            #         )
-
-            # elif self.test_category == TestCategory.AGENT_MULTI_STEP:
-            #     result, process_list = self.inference.multi_step_inference(
-            #         prompt_question,
-            #         initial_config,
-            #         prompt_functions,
-            #         involved_classes,
-            #         test_case_id,
-            #         prompt_time,
-            #     )
-
-            # Eval
-            return response
+            return StepResponse(trace=trace)
         except grpc.RpcError:
             raise
         except (ValueError, AttributeError) as e:
-            logging.error("Error in Step: %s", e)
+            logger.error("Error in Step: %s", e)
             await context.abort(
                 grpc.StatusCode.INVALID_ARGUMENT, f"Invalid request: {e}"
             )
         except Exception as e:
-            logging.error("Unexpected error in Step: %s", e)
+            logger.error("Unexpected error in Step: %s", e)
             await context.abort(grpc.StatusCode.INTERNAL, f"Internal error: {e}")
 
     async def Close(

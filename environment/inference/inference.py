@@ -94,8 +94,9 @@ def get_response_from_client(
     open_ai_client: OpenAI,
     message: list[dict[str, str]],
     model_name: str,
+    test_name: str,
     max_retries: int = SINGLE_TURN_MAX_RETRIES,
-) -> Optional[str]:
+) -> dict[str, object]:
     attempt = 0
     if max_retries < 0:
         max_retries = 0
@@ -127,8 +128,7 @@ def get_response_from_client(
                 continue  # Skip current iteration, continue to next attempt
             elif attempt == 6:
                 raise e  # If maximum attempts reached, raise exception
-
-    return result
+    return {"id": test_name, "result": result}
 
 
 class APIModelInference(BaseHandler):
@@ -155,7 +155,6 @@ class APIModelInference(BaseHandler):
 
         if "gpt" in self.model_name:
             api_key = os.getenv(OPEN_AI_KEY)
-            print("API KEY OBTIANED: ", api_key)
             # api_key = secrets.fetch_secret("OPENAI_API_KEY")
             base_url = os.getenv("GPT_BASE_URL")
         elif "deepseek-r1" in self.model_name:
@@ -179,44 +178,46 @@ class APIModelInference(BaseHandler):
         prompt_profile: str,
         test_case: dict[str, object],
         test_name: str,
-    ):
+    ) -> dict[str, object]:
         """Inference."""
         category: str = test_name.rsplit("_", 1)[0]
         test_id: str = test_name.split("_")[-1]
+
         if "agent" in category:
             initial_config = test_case["initial_config"]
             involved_classes = test_case["involved_classes"]
 
             if "multi_turn" in category:
-                result, process_list = self.multi_turn_inference(
+                return self.multi_turn_inference(
                     prompt_question,
                     initial_config,
                     prompt_function,
                     involved_classes,
                     test_id,
                     prompt_time,
+                    test_name,
                 )
             elif "multi_step" in category:
-                result, process_list = self.multi_step_inference(
+                return self.multi_step_inference(
                     prompt_question,
                     initial_config,
                     prompt_function,
                     involved_classes,
                     test_id,
                     prompt_time,
+                    test_name,
                 )
-            return result, process_list
 
         else:
-            result = self.single_turn_inference(
+            return self.single_turn_inference(
                 prompt_question,
                 prompt_function,
                 category,
                 prompt_time,
                 prompt_profile,
+                test_name,
                 id,  # TODO(sabinakim) - is this intentional change?
             )
-            return result
 
     def single_turn_inference(
         self,
@@ -226,7 +227,8 @@ class APIModelInference(BaseHandler):
         prompt_time: str,
         prompt_profile: str,
         prompt_id: str,
-    ):
+        test_name: str,
+    ) -> dict[str, object]:
         """Single Turn Inference."""
         message = get_single_inference_message(
             self.language,
@@ -235,7 +237,9 @@ class APIModelInference(BaseHandler):
             prompt_profile,
             prompt_question,
         )
-        return get_response_from_client(self.client, message, self.model_name)
+        return get_response_from_client(
+            self.client, message, self.model_name, test_name
+        )
 
     def multi_turn_inference(
         self,
@@ -245,7 +249,8 @@ class APIModelInference(BaseHandler):
         involved_classes: list[str],
         test_id: str,
         prompt_time: str,
-    ) -> tuple[list[dict[str, dict[str, object]]], list[Optional[str]]]:
+        test_name: str,
+    ) -> dict[str, object]:
         agent = APIAgent_turn(
             model_name=self.model_name,
             time=prompt_time,
@@ -319,7 +324,7 @@ class APIModelInference(BaseHandler):
                 result_list.append({name: item_dict})
 
         # Return instance names for subsequent testing of property conformance
-        return result_list, mile_stone
+        return {"id": test_name, "result": result_list, "process": mile_stone}
 
     def multi_step_inference(
         self,
@@ -329,7 +334,8 @@ class APIModelInference(BaseHandler):
         involved_classes,
         test_id,
         prompt_time,
-    ):
+        test_name: str,
+    ) -> dict[str, object]:
         agent = APIAgent_step(
             model_name=self.model_name, time=prompt_time, functions=prompt_functions
         )
@@ -385,4 +391,4 @@ class APIModelInference(BaseHandler):
                 result_list.append({name: item_dict})
 
         # Return instance names for subsequent testing of property conformance
-        return result_list, mile_stone
+        return {"id": test_name, "result": result_list, "process": mile_stone}

@@ -199,7 +199,7 @@ message Trace {
   // Reserve space for extended TraceInfo. If you add an extension, break it
   // apart from the extension range and add a comment to ensure it isn't reused.
 
-  extensions 1000, 1014 to max;
+  extensions 1000, 1015 to max;
   extensions 1001;  // SweBenchTraceInfo
   extensions 1002;  // CodemonkeysLocalizationTraceInfo
   extensions 1003;  // DeepCoderTraceInfo
@@ -215,6 +215,7 @@ message Trace {
   extensions 1011; // Synthetic2TraceInfo
   extensions 1012; // CodemonkeysEditTaskInput
   extensions 1013; // ComponentParameters
+  extensions 1014; // AceBenchTaskInput
 }
 
 message Metric {
